@@ -121,9 +121,9 @@ class BlindbrigadeSceneCfg(InteractiveSceneCfg):
         self.robot.init_state = self.robot.init_state.replace(
             pos=(0.0, 0.0, 0.1)
         )
-        self.priv_robot.init_state = self.robot.init_state.replace(
-            pos=(0.1, 0.1, 0.1)
-        )
+        # self.priv_robot.init_state = self.robot.init_state.replace(
+        #     pos=(0.1, 0.1, 0.1)
+        # )
         self.terrain.terrain_generator.num_rows = int(self.num_envs / 2)
         self.terrain.terrain_generator.num_cols = int(self.num_envs / 2)
         self.terrain.terrain_generator.sub_terrains["boxes"].flat_patch_sampling["root_blind_spawn"].num_patches = self.num_envs

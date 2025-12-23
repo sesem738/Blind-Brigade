@@ -1,23 +1,13 @@
 from __future__ import annotations
 
-import math
-import re
 import torch
 from typing import TYPE_CHECKING, Literal
 
-import carb
-import omni.physics.tensors.impl.api as physx
-from isaacsim.core.utils.extensions import enable_extension
-from pxr import Gf, Sdf, UsdGeom, Vt
-
 import isaaclab.sim as sim_utils
 import isaaclab.utils.math as math_utils
-from isaaclab.actuators import ImplicitActuator
 from isaaclab.assets import Articulation, DeformableObject, RigidObject
-from isaaclab.managers import EventTermCfg, ManagerTermBase, SceneEntityCfg
+from isaaclab.managers import SceneEntityCfg
 from isaaclab.sim.utils.stage import get_current_stage
-from isaaclab.terrains import TerrainImporter
-from isaaclab.utils.version import compare_versions
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
@@ -32,16 +22,6 @@ def reset_root_state(
 ):
     """Reset the asset root state to a random position and velocity uniformly within the given ranges.
 
-    This function randomizes the root position and velocity of the asset.
-
-    * It samples the root position from the given ranges and adds them to the default root position, before setting
-      them into the physics simulation.
-    * It samples the root orientation from the given ranges and sets them into the physics simulation.
-    * It samples the root velocity from the given ranges and sets them into the physics simulation.
-
-    The function takes a dictionary of pose and velocity ranges for each axis and rotation. The keys of the
-    dictionary are ``x``, ``y``, ``z``, ``roll``, ``pitch``, and ``yaw``. The values are tuples of the form
-    ``(min, max)``. If the dictionary does not contain a key, the position or velocity is set to zero for that axis.
     """
     # extract the used quantities (to enable type-hinting)
     asset: RigidObject | Articulation = env.scene[blind_asset_cfg.name]
