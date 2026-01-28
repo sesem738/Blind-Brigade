@@ -13,7 +13,7 @@ from . import agents
 
 
 gym.register(
-    id="Template-Blindbrigade-v0",
+    id="BB-Blindbrigade-v0",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
