@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Installation script for the 'BlindBrigade' python package."""
+"""Installation script for the 'BlindBrigade_tasks' python package."""
 
 import os
 import toml
