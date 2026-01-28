@@ -23,8 +23,8 @@ INSTALL_REQUIRES = [
 
 # Installation operation
 setup(
-    name="BlindBrigade_tasks",
-    packages=["BlindBrigade_tasks"],
+    name="BlindBrigade_assets",
+    packages=["BlindBrigade_assets"],
     author=EXTENSION_TOML_DATA["package"]["author"],
     maintainer=EXTENSION_TOML_DATA["package"]["maintainer"],
     url=EXTENSION_TOML_DATA["package"]["repository"],
