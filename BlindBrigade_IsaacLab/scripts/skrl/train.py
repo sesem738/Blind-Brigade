@@ -117,7 +117,7 @@ from isaaclab_tasks.utils.hydra import hydra_task_config
 # import logger
 logger = logging.getLogger(__name__)
 
-import BlindBrigade.tasks  # noqa: F401
+import BlindBrigade_tasks.tasks  # noqa: F401
 
 # config shortcuts
 if args_cli.agent is None:
