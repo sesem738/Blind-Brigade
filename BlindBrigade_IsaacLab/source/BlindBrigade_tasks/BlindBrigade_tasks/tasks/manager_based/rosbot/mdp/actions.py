@@ -56,51 +56,60 @@ class SE2BaseMecanumDrive(ActionTerm):
         vy = self._processed_actions[:, 1]
         wz = self._processed_actions[:, 2]
 
-        # Compute wheel speeds from body velocities
-        # Formula for omnidirectional/mecanum drive:
-        #   w_fl = (vx - vy - L*wz) / r
-        #   w_fr = (vx + vy + L*wz) / r
-        #   w_rl = (vx - vy + L*wz) / r
-        #   w_rr = (vx + vy - L*wz) / r
-        # where L = half_wheelbase, r = wheel_radius
-        # Note: vy sign might need flipping depending on your coordinate system
-
-        L = self.cfg.half_wheelbase
-        r = self.cfg.wheel_radius
-
-        if self.cfg.o_pattern:
-            # O-pattern (mirrored): vy sign flips
-            w_fl = (vx - vy - L * wz) / r
-            w_fr = (vx + vy - L * wz) / r
-            w_rl = (vx - vy + L * wz) / r
-            w_rr = (vx + vy + L * wz) / r
-        else:
-            # X-pattern (standard)
-            w_fl = (vx - vy + L * wz) / r
-            w_fr = (vx + vy + L * wz) / r
-            w_rl = (vx - vy - L * wz) / r
-            w_rr = (vx + vy - L * wz) / r
-
-        # Clamp wheel speeds
-        w_fl = torch.clamp(w_fl, -self.cfg.max_wheel_speed, self.cfg.max_wheel_speed)
-        w_fr = torch.clamp(w_fr, -self.cfg.max_wheel_speed, self.cfg.max_wheel_speed)
-        w_rl = torch.clamp(w_rl, -self.cfg.max_wheel_speed, self.cfg.max_wheel_speed)
-        w_rr = torch.clamp(w_rr, -self.cfg.max_wheel_speed, self.cfg.max_wheel_speed)
-
-        # Write to simulation
         if self.cfg.animate_wheels:
+            # Compute wheel speeds from body velocities
+            # Write to simulation
+            # Formula for omnidirectional/mecanum drive:
+            #   w_fl = (vx - vy - L*wz) / r
+            #   w_fr = (vx + vy + L*wz) / r
+            #   w_rl = (vx - vy + L*wz) / r
+            #   w_rr = (vx + vy - L*wz) / r
+            # where L = half_wheelbase, r = wheel_radius
+            # Note: vy sign might need flipping depending on your coordinate system
+
+            L = self.cfg.half_wheelbase
+            r = self.cfg.wheel_radius
+
+            if self.cfg.o_pattern:
+                # O-pattern (mirrored): vy sign flips
+                w_fl = (vx - vy - L * wz) / r
+                w_fr = (vx + vy - L * wz) / r
+                w_rl = (vx - vy + L * wz) / r
+                w_rr = (vx + vy + L * wz) / r
+            else:
+                # X-pattern (standard)
+                w_fl = (vx - vy + L * wz) / r
+                w_fr = (vx + vy + L * wz) / r
+                w_rl = (vx - vy - L * wz) / r
+                w_rr = (vx + vy - L * wz) / r
+
+            # Clamp wheel speeds
+            w_fl = torch.clamp(w_fl, -self.cfg.max_wheel_speed, self.cfg.max_wheel_speed)
+            w_fr = torch.clamp(w_fr, -self.cfg.max_wheel_speed, self.cfg.max_wheel_speed)
+            w_rl = torch.clamp(w_rl, -self.cfg.max_wheel_speed, self.cfg.max_wheel_speed)
+            w_rr = torch.clamp(w_rr, -self.cfg.max_wheel_speed, self.cfg.max_wheel_speed)
+        
             # Set angular velocity targets for all 4 wheels
             wheel_vel_targets = torch.stack([w_fl, w_fr, w_rl, w_rr], dim=-1)
             self._asset.set_joint_velocity_target(wheel_vel_targets, joint_ids=self._wheel_joint_ids)
 
         # Only set linear velocity for base (wheels don't move)
-        root_vel = torch.zeros(self.num_envs, 6, device=self.device)
+        # root_vel = torch.zeros(self.num_envs, 6, device=self.device)
+        root_vel = self._asset.data.root_vel_w.clone()  # preserve current velocity (including gravity)
+
 
         # Transform body-frame linear and angular velocities to world-frame
-        root_vel[:, :3] = quat_apply(self._asset.data.root_quat_w, torch.stack((vx, vy, torch.zeros_like(vx)), dim=-1))
-        root_vel[:, 3:] = quat_apply(self._asset.data.root_quat_w, torch.stack((torch.zeros_like(wz), torch.zeros_like(wz), wz), dim=-1))
-        self._asset.write_root_velocity_to_sim(root_vel)
+        root_vel[:, :2] = quat_apply(
+            self._asset.data.root_quat_w, 
+            torch.stack((vx, vy, torch.zeros_like(vx)), dim=-1)
+        )[:, :2] # only x, y
 
+        root_vel[:, 5] = quat_apply(
+            self._asset.data.root_quat_w, 
+            torch.stack((torch.zeros_like(wz), torch.zeros_like(wz), wz), dim=-1)
+        )[:, 2] # only yaw
+
+        self._asset.write_root_velocity_to_sim(root_vel)
         self._prev_vel_cmd = self._processed_actions.clone()
 
     def reset(self, env_ids: torch.Tensor | None = None):

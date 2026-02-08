@@ -3,7 +3,6 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-import math
 
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
@@ -15,12 +14,15 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
+from isaaclab.sensors import ContactSensorCfg
+from isaaclab.sim.spawners.shapes import CuboidCfg
+from isaaclab.sim import CollisionPropertiesCfg
+from isaaclab.envs.mdp.terminations import illegal_contact
 from isaaclab.utils import configclass
 from isaaclab.terrains import (
     TerrainImporterCfg,
     TerrainGeneratorCfg,
     MeshRepeatedBoxesTerrainCfg,
-    MeshPlaneTerrainCfg,
     FlatPatchSamplingCfg
 )
 
@@ -29,10 +31,9 @@ from . import mdp
 ##
 # Pre-defined configs
 ##
-from isaaclab.envs.mdp.commands import UniformPose2dCommandCfg
+from isaaclab.envs.mdp.commands import TerrainBasedPose2dCommandCfg
 from BlindBrigade_assets.robot.rosbot_xl_mecanum import ROSBOT_XL_CFG
 from wheeledlab.envs.mdp.observations import root_euler_xyz
-from .mdp.events import reset_root_state
 from .mdp.actions import SE2BaseMecanumDriveCfg
 
 import torch
@@ -50,6 +51,7 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         prim_path="/World/ground",
         terrain_type="generator",
         max_init_terrain_level=None,
+        use_terrain_origins=True,
         terrain_generator=TerrainGeneratorCfg(
             size=(8.0, 8.0),
             border_width=20.0,
@@ -59,7 +61,6 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
             difficulty_range=(0.0, 1.0),
             use_cache=False,
             sub_terrains={
-                # "flat": MeshPlaneTerrainCfg(proportion=0.2),
                 "boxes":MeshRepeatedBoxesTerrainCfg(
                     platform_width=0,
                     platform_height=0,
@@ -70,12 +71,10 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
                         num_objects=60, height=0.45, size=(0.3, 0.3), max_yx_angle=60.0, degrees=True
                     ),
                     flat_patch_sampling={
-                        "root_blind_spawn": FlatPatchSamplingCfg(
-                            num_patches=1, patch_radius=[0.05, 0.1, 0.2, 0.3, 0.4, 0.5], max_height_diff=0.01),
-                        "root_priv_spawn": FlatPatchSamplingCfg(
-                            num_patches=1, patch_radius=[0.05, 0.1, 0.2, 0.3, 0.4, 0.5], max_height_diff=0.01),
-                        "target_spawn": FlatPatchSamplingCfg(
-                            num_patches=1, patch_radius=[0.05, 0.1, 0.2, 0.3, 0.4, 0.5], max_height_diff=0.01),
+                        "init_pos": FlatPatchSamplingCfg(
+                            num_patches=50, patch_radius=[0.05, 0.1, 0.2, 0.3, 0.4, 0.5], max_height_diff=0.01),
+                        "target": FlatPatchSamplingCfg(
+                            num_patches=50, patch_radius=[0.05, 0.1, 0.2, 0.3, 0.4, 0.5], max_height_diff=0.01),
                     },
                 ),
             },
@@ -98,32 +97,48 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
 
-    robot: ArticulationCfg = ROSBOT_XL_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot: ArticulationCfg = ROSBOT_XL_CFG.replace(
+        prim_path="{ENV_REGEX_NS}/Robot",
+        spawn=ROSBOT_XL_CFG.spawn.replace(activate_contact_sensors=True),
+    )
+    
+    # Ground and obstacles in generated terrain consist of a single mesh
+    # This makes detecting collision with just obstacles hard 
+    # Workaround: 
+    # - Added a cube mesh starting just above the base level of wheels
+    # - Check for contact forces w.r.t. the cube mesh (which remains above ground)
+    robot_contact_sensor: ContactSensorCfg = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/base_link",
+        update_period=0.0,
+        history_length=1,
+        filter_prim_paths_expr=["/World/ground"],
+    )
 
     def __post_init__(self):
         """Post intialization."""
         super().__post_init__()
+        self.filter_collisions = True
         self.robot.init_state = self.robot.init_state.replace(
-            pos=(0.0, 0.0, 0.1)
+            pos=(0.0, 0.0, 0.01)
         )
-        # self.priv_robot.init_state = self.robot.init_state.replace(
-        #     pos=(0.1, 0.1, 0.1)
-        # )
-        self.terrain.terrain_generator.num_rows = int(self.num_envs / 2)
-        self.terrain.terrain_generator.num_cols = int(self.num_envs / 2)
-        self.terrain.terrain_generator.sub_terrains["boxes"].flat_patch_sampling["root_blind_spawn"].num_patches = self.num_envs
-        self.terrain.terrain_generator.sub_terrains["boxes"].flat_patch_sampling["root_priv_spawn"].num_patches = self.num_envs
-        self.terrain.terrain_generator.sub_terrains["boxes"].flat_patch_sampling["target_spawn"].num_patches = self.num_envs
+
+        # 25 x 25 = 625 subterrains
+        # self.terrain.terrain_generator.num_rows = 25
+        # self.terrain.terrain_generator.num_cols = 25
+        self.terrain.terrain_generator.num_rows = 2 # TODO: Remove this, only for debugging
+        self.terrain.terrain_generator.num_cols = 2
 
 @configclass
 class EventCfg:
     """Configuration for the events."""
 
-    set_goal = EventTerm(
-        func=reset_root_state,
+    root_state = EventTerm(
+        func=mdp.reset_root_state_from_terrain,
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("robot"),
+            "pose_range": {"yaw": (-3.14, 3.14)},
+            "velocity_range": {},
         },
     )
 
@@ -138,9 +153,35 @@ def goal_relative_xyz(env : ManagerBasedEnv):
     rel_pos = goal_pos - pos[:, :2]
     return torch.nan_to_num(rel_pos, nan=0)
 
+def goal_distance(env: ManagerBasedEnv) -> torch.Tensor:
+    pos = env.scene["robot"].data.root_pos_w[:, :2]
+    goal = env.command_manager.get_command("goal_pose")[:, :2]
+    return -torch.norm(goal - pos, dim=1)
+
 @configclass
 class ObservationsCfg:
     """Observation specifications for the MDP."""
+
+    @configclass
+    class TeacherCfg(ObsTerm):
+        """
+        Observations for policy group.
+        """
+        goal_relative_xyz = ObsTerm(
+            func=goal_relative_xyz,
+        )
+        world_euler_xyz = ObsTerm(
+            func=root_euler_xyz,
+        )
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, clip=(-10., 10.))
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, clip=(-10., 10.))
+        last_action = ObsTerm(
+            func=mdp.last_action,
+            clip=(-1., 1.)
+        )
+        def __post_init__(self) -> None:
+            self.enable_corruption = False
+            self.concatenate_terms = True
 
     @configclass
     class PolicyCfg(ObsGroup):
@@ -170,12 +211,20 @@ class RewardsCfg:
     """Reward terms for the MDP."""
     alive = RewTerm(func=mdp.is_alive, weight=1.0)
     terminating = RewTerm(func=mdp.is_terminated, weight=-2.0)
+    distance = RewTerm(func=goal_distance,weight=1.0)
 
 
 @configclass
 class TerminationsCfg:
     """Termination terms for the MDP."""
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    terrain_contact = DoneTerm(
+        func=illegal_contact, 
+        params={
+            "threshold": 45,
+            "sensor_cfg": SceneEntityCfg("robot_contact_sensor"),
+            },
+        )
 
 ##
 # Environment configuration
@@ -183,19 +232,16 @@ class TerminationsCfg:
 
 @configclass
 class ElevationCommandCfg:
-    """Configuration for the elevation commands."""
-
-    goal_pose = UniformPose2dCommandCfg(
+    goal_pose = TerrainBasedPose2dCommandCfg(
         asset_name="robot",
-        ranges=UniformPose2dCommandCfg.Ranges(
-            pos_x=(-19.0, 19.0),
-            pos_y=(-19.0, 19.0),
+        ranges=TerrainBasedPose2dCommandCfg.Ranges(
             heading=(-3.14, 3.14),
         ),
-        resampling_time_range=(10.0, 10.0),
+        resampling_time_range=(10.0, 10.0),  # resamples every 10 seconds
         simple_heading=True,
-        debug_vis=True
+        debug_vis=True,
     )
+
 
 @configclass
 class RosbotActionCfg:

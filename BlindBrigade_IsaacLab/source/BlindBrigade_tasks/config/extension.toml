@@ -21,9 +21,10 @@ keywords = ["extension", "BlindBrigade", "isaaclab"]
 "isaaclab_rl" = {}
 "isaaclab_tasks" = {}
 # NOTE: Add additional dependencies here
+"BlindBrigade_assets" = {}
 
 [[python.module]]
-name = "BlindBrigade"
+name = "BlindBrigade_tasks"
 
 [isaac_lab_settings]
 # TODO: Uncomment and list any apt dependencies here.
