@@ -1,6 +1,6 @@
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
-from isaaclab.envs import ManagerBasedRLEnvCfg
+from isaaclab.envs import ManagerBasedRLEnvCfg, ManagerBasedRLEnv
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
@@ -29,9 +29,6 @@ import torch
 from BlindBrigade_assets.robot.rosbot_xl_mecanum import ROSBOT_XL_CFG
 from isaaclab.envs.mdp.commands import TerrainBasedPose2dCommandCfg
 from . import mdp
-
-
-from isaaclab.envs import ManagerBasedRLEnv
 
 ##
 # Scene definition
@@ -140,7 +137,7 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         # 25 x 25 = 625 subterrains
         self.terrain.terrain_generator.num_rows = 25
         self.terrain.terrain_generator.num_cols = 25
-        # self.terrain.terrain_generator.num_rows = 2 # TODO: Only use for debugging
+        # self.terrain.terrain_generator.num_rows = 2    # Only use for debugging
         # self.terrain.terrain_generator.num_cols = 2
 
 @configclass
@@ -175,7 +172,7 @@ def ray_caster_depth(env: ManagerBasedRLEnv) -> torch.Tensor:
     """
     cam = env.scene["ray_caster_cam"]
     depth = cam.data.output["distance_to_image_plane"]
-    depth = torch.nan_to_num(depth, nan=1.0) / 1.0
+    depth = torch.nan_to_num(depth, nan=cam.cfg.max_distance) / cam.cfg.max_distance
     return depth.reshape(env.num_envs, -1)
 
 @configclass
