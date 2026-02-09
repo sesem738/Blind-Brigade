@@ -31,7 +31,7 @@ from isaaclab.envs.mdp.commands import TerrainBasedPose2dCommandCfg
 from . import mdp
 
 
-from isaaclab.envs import ManagerBasedEnv
+from isaaclab.envs import ManagerBasedRLEnv
 
 ##
 # Scene definition
@@ -161,7 +161,7 @@ class EventCfg:
 # MDP settings
 ##
 
-def ray_caster_depth(env: ManagerBasedEnv) -> torch.Tensor:
+def ray_caster_depth(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Alternative:
     ObsTerm(
         func=mdp.image, clip=(0.0,1.0), 
