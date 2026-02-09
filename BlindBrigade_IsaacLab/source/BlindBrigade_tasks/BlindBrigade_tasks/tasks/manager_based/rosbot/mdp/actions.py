@@ -44,8 +44,9 @@ class SE2BaseMecanumDrive(ActionTerm):
 
     def process_actions(self, actions: torch.Tensor):
         self._raw_actions = actions.clone()
+        scaled_actions = actions * torch.tensor([self.cfg.max_vx, self.cfg.max_vy, self.cfg.max_wz], device=self.device)
         self._processed_actions = torch.clamp(
-            actions,
+            scaled_actions,
             min=torch.tensor([-self.cfg.max_vx, -self.cfg.max_vy, -self.cfg.max_wz], device=self.device),
             max=torch.tensor([self.cfg.max_vx, self.cfg.max_vy, self.cfg.max_wz], device=self.device),
         )
@@ -94,9 +95,7 @@ class SE2BaseMecanumDrive(ActionTerm):
             self._asset.set_joint_velocity_target(wheel_vel_targets, joint_ids=self._wheel_joint_ids)
 
         # Only set linear velocity for base (wheels don't move)
-        # root_vel = torch.zeros(self.num_envs, 6, device=self.device)
         root_vel = self._asset.data.root_vel_w.clone()  # preserve current velocity (including gravity)
-
 
         # Transform body-frame linear and angular velocities to world-frame
         root_vel[:, :2] = quat_apply(

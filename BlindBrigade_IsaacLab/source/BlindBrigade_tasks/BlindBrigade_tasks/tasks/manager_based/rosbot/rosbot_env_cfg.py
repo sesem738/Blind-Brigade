@@ -1,9 +1,3 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
-# All rights reserved.
-#
-# SPDX-License-Identifier: BSD-3-Clause
-
-
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
@@ -15,28 +9,28 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sensors import ContactSensorCfg
-from isaaclab.sim.spawners.shapes import CuboidCfg
-from isaaclab.sim import CollisionPropertiesCfg
+from isaaclab.sensors import RayCasterCameraCfg
+from isaaclab.sensors.ray_caster import patterns
 from isaaclab.envs.mdp.terminations import illegal_contact
+from isaaclab_tasks.manager_based.navigation.mdp import position_command_error_tanh, heading_command_error_abs
 from isaaclab.utils import configclass
 from isaaclab.terrains import (
     TerrainImporterCfg,
     TerrainGeneratorCfg,
+    MeshPlaneTerrainCfg,
     MeshRepeatedBoxesTerrainCfg,
     FlatPatchSamplingCfg
 )
-
-from . import mdp
+import torch
 
 ##
 # Pre-defined configs
 ##
-from isaaclab.envs.mdp.commands import TerrainBasedPose2dCommandCfg
 from BlindBrigade_assets.robot.rosbot_xl_mecanum import ROSBOT_XL_CFG
-from wheeledlab.envs.mdp.observations import root_euler_xyz
-from .mdp.actions import SE2BaseMecanumDriveCfg
+from isaaclab.envs.mdp.commands import TerrainBasedPose2dCommandCfg
+from . import mdp
 
-import torch
+
 from isaaclab.envs import ManagerBasedEnv
 
 ##
@@ -45,7 +39,16 @@ from isaaclab.envs import ManagerBasedEnv
 
 @configclass
 class ROSBotSceneCfg(InteractiveSceneCfg):
-    """Configuration for a cart-pole scene."""
+    """Configuration for a rosbot scene.
+    
+    Note: Regarding robot_contact_sensor
+    Ground and obstacles in generated terrain consist of a single mesh
+    This makes detecting collision with just obstacles hard 
+    Workaround: 
+    - Added a cube mesh starting just above the base level of wheels
+    - Check for contact forces w.r.t. the cube mesh (which remains above ground)
+    
+    """
 
     terrain = TerrainImporterCfg(
         prim_path="/World/ground",
@@ -102,31 +105,43 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         spawn=ROSBOT_XL_CFG.spawn.replace(activate_contact_sensors=True),
     )
     
-    # Ground and obstacles in generated terrain consist of a single mesh
-    # This makes detecting collision with just obstacles hard 
-    # Workaround: 
-    # - Added a cube mesh starting just above the base level of wheels
-    # - Check for contact forces w.r.t. the cube mesh (which remains above ground)
     robot_contact_sensor: ContactSensorCfg = ContactSensorCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base_link",
         update_period=0.0,
         history_length=1,
-        filter_prim_paths_expr=["/World/ground"],
+    )
+
+    ray_caster_cam = RayCasterCameraCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/base_link",                                                                       
+        update_period=0.0,
+        data_types=["distance_to_image_plane"],
+        offset=RayCasterCameraCfg.OffsetCfg(
+            pos=(0.15, 0.0, 0.08),   # front of robot, slightly above base
+            rot=(1.0, 0.0, 0.0, 0.0),
+            convention="world",
+        ),
+        pattern_cfg=patterns.PinholeCameraPatternCfg(
+            focal_length=24.0,
+            horizontal_aperture=20.955,
+            width=int(64/2),      # low res for speed
+            height=int(48/2),
+        ),
+        max_distance=1.0,
+        mesh_prim_paths=["/World/ground"],
+        debug_vis=False,
     )
 
     def __post_init__(self):
         """Post intialization."""
         super().__post_init__()
         self.filter_collisions = True
-        self.robot.init_state = self.robot.init_state.replace(
-            pos=(0.0, 0.0, 0.01)
-        )
+        self.robot.init_state = self.robot.init_state.replace(pos=(0.0, 0.0, 0.01))
 
         # 25 x 25 = 625 subterrains
-        # self.terrain.terrain_generator.num_rows = 25
-        # self.terrain.terrain_generator.num_cols = 25
-        self.terrain.terrain_generator.num_rows = 2 # TODO: Remove this, only for debugging
-        self.terrain.terrain_generator.num_cols = 2
+        self.terrain.terrain_generator.num_rows = 25
+        self.terrain.terrain_generator.num_cols = 25
+        # self.terrain.terrain_generator.num_rows = 2 # TODO: Only use for debugging
+        # self.terrain.terrain_generator.num_cols = 2
 
 @configclass
 class EventCfg:
@@ -146,58 +161,36 @@ class EventCfg:
 # MDP settings
 ##
 
-def goal_relative_xyz(env : ManagerBasedEnv):
-    pos = mdp.root_pos_w(env)
-    goal_pos = mdp.generated_commands(env, "goal_pose")
-    goal_pos = goal_pos[:, :2]  # we only need the x, y coordinates
-    rel_pos = goal_pos - pos[:, :2]
-    return torch.nan_to_num(rel_pos, nan=0)
-
-def goal_distance(env: ManagerBasedEnv) -> torch.Tensor:
-    pos = env.scene["robot"].data.root_pos_w[:, :2]
-    goal = env.command_manager.get_command("goal_pose")[:, :2]
-    return -torch.norm(goal - pos, dim=1)
+def ray_caster_depth(env: ManagerBasedEnv) -> torch.Tensor:
+    """Alternative:
+    ObsTerm(
+        func=mdp.image, clip=(0.0,1.0), 
+        params={
+            "sensor_cfg": SceneEntityCfg("ray_caster_cam"),
+            "data_type":"distance_to_image_plane",
+            "normalize":False
+        }
+    )
+    * Needs to be flattened if using MLP instead of CNN
+    """
+    cam = env.scene["ray_caster_cam"]
+    depth = cam.data.output["distance_to_image_plane"]
+    depth = torch.nan_to_num(depth, nan=1.0) / 1.0
+    return depth.reshape(env.num_envs, -1)
 
 @configclass
 class ObservationsCfg:
     """Observation specifications for the MDP."""
 
     @configclass
-    class TeacherCfg(ObsTerm):
-        """
-        Observations for policy group.
-        """
-        goal_relative_xyz = ObsTerm(
-            func=goal_relative_xyz,
-        )
-        world_euler_xyz = ObsTerm(
-            func=root_euler_xyz,
-        )
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, clip=(-10., 10.))
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, clip=(-10., 10.))
-        last_action = ObsTerm(
-            func=mdp.last_action,
-            clip=(-1., 1.)
-        )
-        def __post_init__(self) -> None:
-            self.enable_corruption = False
-            self.concatenate_terms = True
-
-    @configclass
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
-        goal_relative_xyz = ObsTerm(
-            func=goal_relative_xyz,
-        )
-        world_euler_xyz = ObsTerm(
-            func=root_euler_xyz,
-        )
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, clip=(-10., 10.))
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, clip=(-10., 10.))
-        last_action = ObsTerm(
-            func=mdp.last_action,
-            clip=(-1., 1.)
-        )
+        pose_command = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, clip=(-1.0,1.0))
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, clip=(-2.0, 2.0))
+        ray_caster   = ObsTerm(func=ray_caster_depth, clip=(0.0,1.0))
+        last_action  = ObsTerm(func=mdp.last_action, clip=(-1., 1.))
+
         def __post_init__(self) -> None:
             self.enable_corruption = False
             self.concatenate_terms = True
@@ -209,10 +202,26 @@ class ObservationsCfg:
 @configclass
 class RewardsCfg:
     """Reward terms for the MDP."""
-    alive = RewTerm(func=mdp.is_alive, weight=1.0)
-    terminating = RewTerm(func=mdp.is_terminated, weight=-2.0)
-    distance = RewTerm(func=goal_distance,weight=1.0)
+    # Add mdp.undesired_contacts for collision reward, if required. Skipped here.
 
+    terminating = RewTerm(func=mdp.is_terminated, weight=-400.0)
+    position_tracking = RewTerm(
+        func=position_command_error_tanh,
+        weight=0.5,
+        params={"std": 2.0, "command_name": "goal_pose"},
+    )
+    position_tracking_fine_grained = RewTerm(
+        func=position_command_error_tanh,
+        weight=0.5,
+        params={"std": 0.2, "command_name": "goal_pose"},
+    )
+    orientation_tracking = RewTerm(
+        func=heading_command_error_abs,
+        weight=-0.2,
+        params={"command_name": "goal_pose"},
+    )
+    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
+    
 
 @configclass
 class TerminationsCfg:
@@ -226,12 +235,11 @@ class TerminationsCfg:
             },
         )
 
-##
-# Environment configuration
-##
 
 @configclass
-class ElevationCommandCfg:
+class CommandCfg:
+    """Commands for the rosbot."""
+
     goal_pose = TerrainBasedPose2dCommandCfg(
         asset_name="robot",
         ranges=TerrainBasedPose2dCommandCfg.Ranges(
@@ -247,7 +255,7 @@ class ElevationCommandCfg:
 class RosbotActionCfg:
     """Actions for the rosbot."""
 
-    base_twist: SE2BaseMecanumDriveCfg = SE2BaseMecanumDriveCfg(
+    base_twist: mdp.SE2BaseMecanumDriveCfg = mdp.SE2BaseMecanumDriveCfg(
         wheel_radius=0.05,     
         half_wheelbase=0.125,   
         half_track=0.105,       
@@ -255,9 +263,19 @@ class RosbotActionCfg:
         animate_wheels=True,
     )
 
-@configclass
-class RosbotEnvCfg(ManagerBasedRLEnvCfg):
 
+#####################################################################
+#
+#                   Environment Configuration
+#
+#####################################################################
+
+
+@configclass
+class RosbotNavBoxTerrainEnvCfg(ManagerBasedRLEnvCfg):
+    """
+    This env config contains a rosbot and box obstacles
+    """
     seed: int = 42
 
     # Scene settings
@@ -270,17 +288,44 @@ class RosbotEnvCfg(ManagerBasedRLEnvCfg):
     rewards: RewardsCfg = RewardsCfg()
     terminations: TerminationsCfg = TerminationsCfg()
 
-    commands = ElevationCommandCfg = ElevationCommandCfg()
+    commands: CommandCfg = CommandCfg()
     events: EventCfg = EventCfg()
 
     # Post initialization
     def __post_init__(self) -> None:
         """Post initialization."""
         # general settings
-        self.decimation = 2
-        self.episode_length_s = 5
+        self.decimation = 3 # 40 Hz
+        self.episode_length_s = 15
         # viewer settings
         self.viewer.eye = (8.0, 0.0, 5.0)
         # simulation settings
         self.sim.dt = 1 / 120
         self.sim.render_interval = self.decimation
+        self.sim.physx.gpu_max_rigid_patch_count = 200000 # For large number for flat patches
+
+
+@configclass
+class RosbotNavFlatTerrainEnvCfg(RosbotNavBoxTerrainEnvCfg):
+    """
+    This is a test environment. Designed to test & train RosbotNavBoxTerrainEnvCfg on flat terrain.
+    """
+    
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.terrain.terrain_generator.sub_terrains = {
+            "flat": MeshPlaneTerrainCfg(
+                size=(8.0,8.0),
+                flat_patch_sampling={          
+                "init_pos": FlatPatchSamplingCfg(num_patches=50, patch_radius=[0.05, 0.1, 0.2, 0.3, 0.4, 0.5], max_height_diff=0.01),
+                "target": FlatPatchSamplingCfg(num_patches=50, patch_radius=[0.05, 0.1, 0.2, 0.3, 0.4, 0.5], max_height_diff=0.01),
+                },
+            ),
+        }
+
+        # Disables sensors not required for flat single robot env
+        self.scene.ray_caster_cam = None
+        self.observations.policy.ray_caster = None
+        self.terminations.terrain_contact = None
+
+    
