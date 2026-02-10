@@ -35,10 +35,14 @@ from isaaclab.envs.mdp.commands import UniformPose2dCommandCfg
 from wheeledlab_assets.mushr import MUSHR_SUS_CFG
 from wheeledlab_tasks.common import Mushr4WDActionCfg
 from wheeledlab.envs.mdp.observations import root_euler_xyz
+from BlindBrigade_assets import ROSORIN_MECANNUM_SRB
+from .mdp.actions import RigidBodyPDActionCfg
 from .mdp.events import reset_root_state
 
 import torch
 from isaaclab.envs import ManagerBasedEnv
+from isaaclab.sensors import CameraCfg, TiledCameraCfg
+from isaaclab.assets import RigidObjectCfg
 
 ##
 # Scene definition
@@ -102,6 +106,33 @@ class BlindbrigadeSceneCfg(InteractiveSceneCfg):
 
     robot: ArticulationCfg = MUSHR_SUS_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
     # priv_robot: ArticulationCfg = MUSHR_SUS_CFG.replace(prim_path="{ENV_REGEX_NS}/RobotPriv")
+
+    # --- Robot as a single rigid body (kinematic) ---
+    guide: RigidObjectCfg = ROSORIN_MECANNUM_SRB
+
+    # --- Depth camera attached to an existing camera link frame on the robot ---
+    # Your screenshot shows camera_link0 under base_link.
+    depth_cam: TiledCameraCfg = TiledCameraCfg(
+        prim_path="{ENV_REGEX_NS}/rosorin_mecanum/base_link/camera_link0/depth_cam",
+        update_period=0.0,  # every sim step; set e.g. 0.1 for 10 Hz
+        width=640,
+        height=480,
+        data_types=[
+            "distance_to_image_plane",  # "depth" in meters along camera optical axis
+        ],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0,
+            focus_distance=400.0,
+            horizontal_aperture=20.955,
+            clipping_range=(0.1, 1.0e5),
+        ),
+        # Offset relative to camera_link0 (keep small; set to (0,0,0, identity) if camera_link0 is already correct)
+        offset=CameraCfg.OffsetCfg(
+            pos=(0.0, 0.0, 0.0),
+            rot=(0.5,0.5,-0.5,-0.5),   # quaternion (w,x,y,z)
+            convention="opengl",
+        ),
+    )
 
     height_scanner = RayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/mushr_nano/base_link",
@@ -213,6 +244,14 @@ class ElevationCommandCfg:
         debug_vis=True
     )
 
+# @configclass
+# class GuideActionCfg(Mushr4WDActionCfg):
+#     """Actions for the guide rigid body."""
+#     srb_control: RigidBodyPDActionCfg = RigidBodyPDActionCfg(
+#         asset_name="guide",
+#         kp=100000.0,  # tune these gains
+#         kd=10000.0,
+#     )
 
 @configclass
 class BlindbrigadeEnvCfg(ManagerBasedRLEnvCfg):

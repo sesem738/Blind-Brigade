@@ -7,6 +7,7 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
+from isaaclab.managers import CurriculumTermCfg as CurriculumTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sensors import ContactSensorCfg
 from isaaclab.sensors import RayCasterCameraCfg
@@ -59,16 +60,17 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
             vertical_scale=0.005,
             slope_threshold=0.75,
             difficulty_range=(0.0, 1.0),
+            curriculum=True,
             use_cache=False,
             sub_terrains={
                 "boxes":MeshRepeatedBoxesTerrainCfg(
                     platform_width=0,
                     platform_height=0,
                     object_params_start=MeshRepeatedBoxesTerrainCfg.ObjectCfg(
-                        num_objects=40, height=0.25, size=(0.05, 0.05), max_yx_angle=0.0, degrees=True
+                        num_objects=0, height=0.25, size=(0.05, 0.05), max_yx_angle=0.0, degrees=True
                     ),
                     object_params_end=MeshRepeatedBoxesTerrainCfg.ObjectCfg(
-                        num_objects=60, height=0.45, size=(0.3, 0.3), max_yx_angle=60.0, degrees=True
+                        num_objects=40, height=0.45, size=(0.3, 0.3), max_yx_angle=60.0, degrees=True
                     ),
                     flat_patch_sampling={
                         "init_pos": FlatPatchSamplingCfg(
@@ -137,8 +139,8 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         # 25 x 25 = 625 subterrains
         self.terrain.terrain_generator.num_rows = 25
         self.terrain.terrain_generator.num_cols = 25
-        # self.terrain.terrain_generator.num_rows = 2    # Only use for debugging
-        # self.terrain.terrain_generator.num_cols = 2
+        # self.terrain.terrain_generator.num_rows = 3    # Only use for debugging
+        # self.terrain.terrain_generator.num_cols = 3
 
 @configclass
 class EventCfg:
@@ -157,6 +159,9 @@ class EventCfg:
 ##
 # MDP settings
 ##
+
+def base_yaw_rate(env: ManagerBasedRLEnv) -> torch.Tensor:                                                            
+    return env.scene["robot"].data.root_ang_vel_b[:, 2:3] 
 
 def ray_caster_depth(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Alternative:
@@ -182,11 +187,11 @@ class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
-        pose_command = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, clip=(-1.0,1.0))
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, clip=(-2.0, 2.0))
-        ray_caster   = ObsTerm(func=ray_caster_depth, clip=(0.0,1.0))
-        last_action  = ObsTerm(func=mdp.last_action, clip=(-1., 1.))
+        pose_command  = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
+        base_lin_vel  = ObsTerm(func=mdp.base_lin_vel, clip=(-1.0,1.0))
+        base_yaw_rate = ObsTerm(func=base_yaw_rate, clip=(-2.0, 2.0))
+        ray_caster    = ObsTerm(func=ray_caster_depth, clip=(0.0,1.0))
+        last_action   = ObsTerm(func=mdp.last_action, clip=(-1., 1.))
 
         def __post_init__(self) -> None:
             self.enable_corruption = False
@@ -247,6 +252,17 @@ class CommandCfg:
         debug_vis=True,
     )
 
+@configclass
+class CurriculumCfg:
+    """Curriculum for the rosbot"""
+
+    terrain_level = CurriculumTerm(
+        func=mdp.terrain_levels_nav,
+        params={
+            "promote_threshold": 0.1, 
+            "demote_threshold": 0.2
+        }
+    )
 
 @configclass
 class RosbotActionCfg:
@@ -285,6 +301,7 @@ class RosbotNavBoxTerrainEnvCfg(ManagerBasedRLEnvCfg):
     rewards: RewardsCfg = RewardsCfg()
     terminations: TerminationsCfg = TerminationsCfg()
 
+    curriculum: CurriculumCfg = CurriculumCfg()
     commands: CommandCfg = CommandCfg()
     events: EventCfg = EventCfg()
 
@@ -324,5 +341,6 @@ class RosbotNavFlatTerrainEnvCfg(RosbotNavBoxTerrainEnvCfg):
         self.scene.ray_caster_cam = None
         self.observations.policy.ray_caster = None
         self.terminations.terrain_contact = None
+        self.curriculum = None
 
     

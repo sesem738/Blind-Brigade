@@ -1,14 +1,11 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
-# All rights reserved.
-#
-# SPDX-License-Identifier: BSD-3-Clause
+"""Python module for tasks."""
 
-"""
-Python module serving as a project/extension template.
-"""
+from isaaclab_tasks.utils import import_packages
 
-# Register Gym environments.
-from .tasks import *
+# The blacklist is used to prevent importing configs from sub-packages
+_BLACKLIST_PKGS = ["utils", ".mdp"]
+# Import all configs in this package
+import_packages(__name__, _BLACKLIST_PKGS)
 
 # Register UI extensions.
 from .ui_extension_example import *
