@@ -1,0 +1,65 @@
+--- git status ---
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/rosbot_env_cfg.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.vscode/
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_0.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_100.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1000.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1050.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1100.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1150.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1200.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1250.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1300.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1350.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1400.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1450.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_150.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_200.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_250.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_300.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_350.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_400.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_450.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_50.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_500.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_550.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_600.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_650.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_700.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_750.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_800.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_850.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_900.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_950.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/
+	BlindBrigade_IsaacLab/source/.vscode/
+	BlindBrigade_IsaacLab/source/BlindBrigade_assets/BlindBrigade_assets/robot/rosorin_backup.py
+	BlindBrigade_IsaacLab/source/BlindBrigade_assets/data/mecanum_planar/
+	BlindBrigade_IsaacLab/source/BlindBrigade_assets/data/rosorin_mecanum/
+
+no changes added to commit (use "git add" and/or "git commit -a") 
+
+
+--- git diff ---
+diff --git a/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/rosbot_env_cfg.py b/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/rosbot_env_cfg.py
+index e3f3d76..2cb9f17 100644
+--- a/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/rosbot_env_cfg.py
++++ b/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/rosbot_env_cfg.py
+@@ -235,7 +235,7 @@ class CommandCfg:
+             heading=(-3.14, 3.14),
+         ),
+         resampling_time_range=(10.0, 10.0),
+-        simple_heading=True,
++        simple_heading=False,
+         debug_vis=True,
+     )
+ 

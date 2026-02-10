@@ -235,7 +235,7 @@ class CommandCfg:
             heading=(-3.14, 3.14),
         ),
         resampling_time_range=(10.0, 10.0),
-        simple_heading=True,
+        simple_heading=False,
         debug_vis=True,
     )
 
