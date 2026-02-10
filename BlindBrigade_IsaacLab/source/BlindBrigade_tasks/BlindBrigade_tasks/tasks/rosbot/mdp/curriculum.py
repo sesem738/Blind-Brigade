@@ -1,12 +1,17 @@
 """Curriculum terms for rigid body control."""
 
 from __future__ import annotations
-from isaaclab.managers import SceneEntityCfg
+from typing import TYPE_CHECKING
+
 import torch
+
+if TYPE_CHECKING:
+    from isaaclab.envs import ManagerBasedRLEnv
 
 
 def terrain_levels_nav(
-        env, env_ids, 
+        env: ManagerBasedRLEnv,
+        env_ids: torch.Tensor, 
         promote_threshold: float = 0.1, 
         demote_threshold: float = 0.2
     ):

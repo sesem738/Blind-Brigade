@@ -1,20 +1,17 @@
+"""Event terms for rigid body control."""
+
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import torch
-from typing import TYPE_CHECKING, Literal
-
-import isaaclab.sim as sim_utils
-import isaaclab.utils.math as math_utils
-from isaaclab.assets import Articulation, DeformableObject, RigidObject
-from isaaclab.managers import SceneEntityCfg
-from isaaclab.sim.utils.stage import get_current_stage
 
 if TYPE_CHECKING:
-    from isaaclab.envs import ManagerBasedEnv
+    from isaaclab.envs import ManagerBasedRLEnv
+    from isaaclab.managers import SceneEntityCfg
 
 
 def reset_two_robots(                                                                                         
-    env: ManagerBasedEnv,
+    env: ManagerBasedRLEnv,
     env_ids: torch.Tensor,                                                                                    
     robot1_cfg: SceneEntityCfg,
     robot2_cfg: SceneEntityCfg,

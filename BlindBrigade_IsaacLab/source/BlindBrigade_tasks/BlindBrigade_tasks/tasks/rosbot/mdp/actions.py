@@ -1,29 +1,23 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
-# All rights reserved.
-#
-# SPDX-License-Identifier: BSD-3-Clause
-
 """Action terms for rigid body control."""
 
 from __future__ import annotations
-
-import torch
 from typing import TYPE_CHECKING
 
-from isaaclab.assets import Articulation
+import torch
 from isaaclab.managers import ActionTerm, ActionTermCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.math import quat_apply
 
 if TYPE_CHECKING:
-    from isaaclab.envs import ManagerBasedEnv
+    from isaaclab.envs import ManagerBasedRLEnv
+    from isaaclab.assets import Articulation
 
 
 class SE2BaseMecanumDrive(ActionTerm):
     cfg: SE2BaseMecanumDriveCfg
     _asset: Articulation
 
-    def __init__(self, cfg: SE2BaseMecanumDriveCfg, env: ManagerBasedEnv):
+    def __init__(self, cfg: SE2BaseMecanumDriveCfg, env: ManagerBasedRLEnv):
         super().__init__(cfg, env)
         self._asset = env.scene[cfg.asset_name]
         # Find joint indices for the wheel joints

@@ -1,20 +1,21 @@
 import isaaclab.sim as sim_utils
-from isaaclab.assets import ArticulationCfg, AssetBaseCfg
-from isaaclab.envs import ManagerBasedRLEnvCfg, ManagerBasedRLEnv
-from isaaclab.managers import EventTermCfg as EventTerm
-from isaaclab.managers import ObservationGroupCfg as ObsGroup
-from isaaclab.managers import ObservationTermCfg as ObsTerm
-from isaaclab.managers import RewardTermCfg as RewTerm
-from isaaclab.managers import SceneEntityCfg
-from isaaclab.managers import TerminationTermCfg as DoneTerm
-from isaaclab.managers import CurriculumTermCfg as CurriculumTerm
+from isaaclab.envs import ManagerBasedRLEnvCfg
+from isaaclab.managers import (
+    SceneEntityCfg,
+    EventTermCfg as EventTerm,
+    ObservationGroupCfg as ObsGroup,
+    ObservationTermCfg as ObsTerm,
+    RewardTermCfg as RewTerm,
+    TerminationTermCfg as DoneTerm,
+    CurriculumTermCfg as CurriculumTerm
+)
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sensors import ContactSensorCfg
-from isaaclab.sensors import RayCasterCameraCfg
-from isaaclab.sensors.ray_caster import patterns
-from isaaclab.envs.mdp.terminations import illegal_contact
-from isaaclab_tasks.manager_based.navigation.mdp import position_command_error_tanh, heading_command_error_abs
-from isaaclab.utils import configclass
+from isaaclab.assets import ArticulationCfg, AssetBaseCfg
+from isaaclab.sensors import (
+    ContactSensorCfg,
+    RayCasterCameraCfg,
+    patterns
+)
 from isaaclab.terrains import (
     TerrainImporterCfg,
     TerrainGeneratorCfg,
@@ -22,7 +23,9 @@ from isaaclab.terrains import (
     MeshRepeatedBoxesTerrainCfg,
     FlatPatchSamplingCfg
 )
-import torch
+from isaaclab.envs.mdp.terminations import illegal_contact
+from isaaclab_tasks.manager_based.navigation.mdp import position_command_error_tanh, heading_command_error_abs
+from isaaclab.utils import configclass
 
 ##
 # Pre-defined configs
@@ -142,6 +145,13 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         # self.terrain.terrain_generator.num_rows = 3    # Only use for debugging
         # self.terrain.terrain_generator.num_cols = 3
 
+
+#####################################################################
+#
+#                           MDP settings
+#
+#####################################################################
+
 @configclass
 class EventCfg:
     """Configuration for the events."""
@@ -156,29 +166,6 @@ class EventCfg:
         },
     )
 
-##
-# MDP settings
-##
-
-def base_yaw_rate(env: ManagerBasedRLEnv) -> torch.Tensor:                                                            
-    return env.scene["robot"].data.root_ang_vel_b[:, 2:3] 
-
-def ray_caster_depth(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Alternative:
-    ObsTerm(
-        func=mdp.image, clip=(0.0,1.0), 
-        params={
-            "sensor_cfg": SceneEntityCfg("ray_caster_cam"),
-            "data_type":"distance_to_image_plane",
-            "normalize":False
-        }
-    )
-    * Needs to be flattened if using MLP instead of CNN
-    """
-    cam = env.scene["ray_caster_cam"]
-    depth = cam.data.output["distance_to_image_plane"]
-    depth = torch.nan_to_num(depth, nan=cam.cfg.max_distance) / cam.cfg.max_distance
-    return depth.reshape(env.num_envs, -1)
 
 @configclass
 class ObservationsCfg:
@@ -188,10 +175,10 @@ class ObservationsCfg:
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
         pose_command  = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
-        base_lin_vel  = ObsTerm(func=mdp.base_lin_vel, clip=(-1.0,1.0))
-        base_yaw_rate = ObsTerm(func=base_yaw_rate, clip=(-2.0, 2.0))
-        ray_caster    = ObsTerm(func=ray_caster_depth, clip=(0.0,1.0))
-        last_action   = ObsTerm(func=mdp.last_action, clip=(-1., 1.))
+        base_lin_vel  = ObsTerm(func=mdp.base_lin_vel,       clip=(-1.0,1.0))
+        base_yaw_rate = ObsTerm(func=mdp.base_yaw_rate,      clip=(-2.0, 2.0))
+        ray_caster    = ObsTerm(func=mdp.ray_caster_depth,   clip=(0.0,1.0))
+        last_action   = ObsTerm(func=mdp.last_action,        clip=(-1., 1.))
 
         def __post_init__(self) -> None:
             self.enable_corruption = False
@@ -247,7 +234,7 @@ class CommandCfg:
         ranges=TerrainBasedPose2dCommandCfg.Ranges(
             heading=(-3.14, 3.14),
         ),
-        resampling_time_range=(10.0, 10.0),  # resamples every 10 seconds
+        resampling_time_range=(10.0, 10.0),
         simple_heading=True,
         debug_vis=True,
     )
@@ -327,6 +314,7 @@ class RosbotNavFlatTerrainEnvCfg(RosbotNavBoxTerrainEnvCfg):
     
     def __post_init__(self):
         super().__post_init__()
+        self.scene.terrain.terrain_generator.curriculum = False
         self.scene.terrain.terrain_generator.sub_terrains = {
             "flat": MeshPlaneTerrainCfg(
                 size=(8.0,8.0),
