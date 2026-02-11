@@ -14,6 +14,7 @@ from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.sensors import (
     ContactSensorCfg,
     RayCasterCameraCfg,
+    RayCasterCfg,
     patterns
 )
 from isaaclab.terrains import (
@@ -54,7 +55,7 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
     terrain = TerrainImporterCfg(
         prim_path="/World/ground",
         terrain_type="generator",
-        max_init_terrain_level=None,
+        max_init_terrain_level=0,
         use_terrain_origins=True,
         terrain_generator=TerrainGeneratorCfg(
             size=(8.0, 8.0),
@@ -122,11 +123,48 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
             rot=(1.0, 0.0, 0.0, 0.0),
             convention="world",
         ),
-        pattern_cfg=patterns.PinholeCameraPatternCfg(
-            focal_length=24.0,
-            horizontal_aperture=20.955,
-            width=int(64/2),      # low res for speed
-            height=int(48/2),
+        pattern_cfg=patterns.PinholeCameraPatternCfg(                                                                                                                                               
+            focal_length=2.1,                  
+            horizontal_aperture=6.0,
+            width=32,
+            height=18,  # 16:9 aspect ratio
+        ),
+
+        max_distance=1.0,
+        mesh_prim_paths=["/World/ground"],
+        debug_vis=False,
+    )
+    
+    ray_caster_lidar_left = RayCasterCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/base_link",                                                                       
+        update_period=0.0,
+        offset=RayCasterCfg.OffsetCfg(
+            pos=(0.15, 0.0, 0.08),   # front of robot, slightly above base
+            rot=(0.7071, 0.0, 0.0, 0.7071),
+        ),
+        pattern_cfg=patterns.LidarPatternCfg(
+            channels=1,
+            vertical_fov_range=(0.0, 0.0),
+            horizontal_fov_range=(-45.0, 90.0),
+            horizontal_res=5.0, # ray every 5° → 18 rays
+        ),
+        max_distance=1.0,
+        mesh_prim_paths=["/World/ground"],
+        debug_vis=False,
+    )
+    
+    ray_caster_lidar_right = RayCasterCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/base_link",                                                                       
+        update_period=0.0,
+        offset=RayCasterCfg.OffsetCfg(
+            pos=(0.15, 0.0, 0.08),   # front of robot, slightly above base
+            rot=(0.7071, 0.0, 0.0, -0.7071),
+        ),
+        pattern_cfg=patterns.LidarPatternCfg(
+            channels=1,
+            vertical_fov_range=(0.0, 0.0),
+            horizontal_fov_range=(-90.0, 45.0),
+            horizontal_res=5.0, # ray every 5° → 18 rays
         ),
         max_distance=1.0,
         mesh_prim_paths=["/World/ground"],
@@ -140,10 +178,10 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         self.robot.init_state = self.robot.init_state.replace(pos=(0.0, 0.0, 0.01))
 
         # 25 x 25 = 625 subterrains
-        self.terrain.terrain_generator.num_rows = 25
-        self.terrain.terrain_generator.num_cols = 25
-        # self.terrain.terrain_generator.num_rows = 3    # Only use for debugging
-        # self.terrain.terrain_generator.num_cols = 3
+        # self.terrain.terrain_generator.num_rows = 25
+        # self.terrain.terrain_generator.num_cols = 25
+        self.terrain.terrain_generator.num_rows = 3    # Only use for debugging
+        self.terrain.terrain_generator.num_cols = 3
 
 
 #####################################################################
@@ -174,11 +212,26 @@ class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
-        pose_command  = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
-        base_lin_vel  = ObsTerm(func=mdp.base_lin_vel,       clip=(-1.0,1.0))
-        base_yaw_rate = ObsTerm(func=mdp.base_yaw_rate,      clip=(-2.0, 2.0))
-        ray_caster    = ObsTerm(func=mdp.ray_caster_depth,   clip=(0.0,1.0))
-        last_action   = ObsTerm(func=mdp.last_action,        clip=(-1., 1.))
+        pose_command   = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
+        base_lin_vel   = ObsTerm(func=mdp.base_lin_vel,       clip=(-1.0,1.0))
+        base_yaw_rate  = ObsTerm(func=mdp.base_yaw_rate,      clip=(-2.0, 2.0))
+        ray_caster_cam = ObsTerm(func=mdp.ray_caster_depth,   clip=(0.0,1.0))
+        last_action    = ObsTerm(func=mdp.last_action,        clip=(-1., 1.))
+
+        def __post_init__(self) -> None:
+            self.enable_corruption = False
+            self.concatenate_terms = True
+
+    @configclass
+    class CriticCfg(ObsGroup):
+        """Observations for policy group."""
+        pose_command   = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
+        base_lin_vel   = ObsTerm(func=mdp.base_lin_vel,       clip=(-1.0,1.0))
+        base_yaw_rate  = ObsTerm(func=mdp.base_yaw_rate,      clip=(-2.0, 2.0))
+        ray_caster_cam = ObsTerm(func=mdp.ray_caster_depth,   clip=(0.0,1.0))
+        lidar_left     = ObsTerm(func=mdp.ray_caster_lidar,   clip=(0.0,1.0), params={"asset_cfg": SceneEntityCfg("ray_caster_lidar_left")})
+        lidar_right    = ObsTerm(func=mdp.ray_caster_lidar,   clip=(0.0,1.0), params={"asset_cfg": SceneEntityCfg("ray_caster_lidar_right")})
+        last_action    = ObsTerm(func=mdp.last_action,        clip=(-1., 1.))
 
         def __post_init__(self) -> None:
             self.enable_corruption = False
@@ -186,6 +239,7 @@ class ObservationsCfg:
 
     # observation groups
     policy: PolicyCfg = PolicyCfg()
+    critic: CriticCfg = CriticCfg()
 
 
 @configclass
@@ -204,12 +258,27 @@ class RewardsCfg:
         weight=0.5,
         params={"std": 0.2, "command_name": "goal_pose"},
     )
+    position_tracking_pricision = RewTerm(
+        func=position_command_error_tanh,
+        weight=0.5,
+        params={"std": 0.05, "command_name": "goal_pose"},
+    )
     orientation_tracking = RewTerm(
         func=heading_command_error_abs,
         weight=-0.2,
         params={"command_name": "goal_pose"},
     )
     action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
+    lateral_vel = RewTerm(func=mdp.lateral_velocity_penalty_l2, weight=-0.01)
+
+    # Non-contributing reward term. Used to track success
+    track_success = RewTerm(
+        func=mdp.track_goal_reached, 
+        params={
+            "promote_threshold": 0.1,
+        },
+        weight=0.0
+    )
     
 
 @configclass
@@ -243,13 +312,7 @@ class CommandCfg:
 class CurriculumCfg:
     """Curriculum for the rosbot"""
 
-    terrain_level = CurriculumTerm(
-        func=mdp.terrain_levels_nav,
-        params={
-            "promote_threshold": 0.1, 
-            "demote_threshold": 0.2
-        }
-    )
+    terrain_level = CurriculumTerm(func=mdp.terrain_levels_nav_success_based)
 
 @configclass
 class RosbotActionCfg:
@@ -326,9 +389,12 @@ class RosbotNavFlatTerrainEnvCfg(RosbotNavBoxTerrainEnvCfg):
         }
 
         # Disables sensors not required for flat single robot env
-        self.scene.ray_caster_cam = None
+        self.scene.ray_caster_cam_front = None
+        self.scene.ray_caster_cam_left = None
+        self.scene.ray_caster_cam_right = None
         self.observations.policy.ray_caster = None
         self.terminations.terrain_contact = None
         self.curriculum = None
+        self.rewards.lateral_vel = None
 
-    
+    mdp.joint_vel_l1 

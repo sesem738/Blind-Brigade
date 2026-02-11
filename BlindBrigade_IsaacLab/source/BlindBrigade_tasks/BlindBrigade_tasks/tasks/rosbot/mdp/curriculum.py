@@ -28,3 +28,25 @@ def terrain_levels_nav(
 
     terrain.update_env_origins(env_ids, move_up, move_down)
     return torch.mean(terrain.terrain_levels.float())
+
+def terrain_levels_nav_success_based(
+    env: ManagerBasedRLEnv,
+    env_ids: torch.Tensor, 
+    ):                                                                                 
+    terrain = env.scene.terrain
+                                                                                                                    
+    # on first call, initialize buffers
+    if not hasattr(terrain, "_success_count"):
+        terrain._success_count = torch.zeros(env.num_envs, device=env.device)
+
+    # promote/demote based on accumulated successes this episode
+    move_up = terrain._success_count[env_ids] >= 1  # reached near a goal
+    move_down = terrain._success_count[env_ids] == 0  # reached nothing
+    move_down *= ~move_up
+
+    terrain.update_env_origins(env_ids, move_up, move_down)
+
+    # reset counter for envs that just terminated
+    terrain._success_count[env_ids] = 0
+
+    return torch.mean(terrain.terrain_levels.float())

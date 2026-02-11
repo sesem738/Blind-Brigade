@@ -21,7 +21,8 @@ def base_yaw_rate(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntit
     asset: Articulation = env.scene[asset_cfg.name]              
     return asset.data.root_ang_vel_b[:, 2:3] 
 
-def ray_caster_depth(env: ManagerBasedRLEnv) -> torch.Tensor:
+
+def ray_caster_depth(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("ray_caster_cam")) -> torch.Tensor:
     """Alternative:
     ObsTerm(
         func=mdp.image, clip=(0.0,1.0), 
@@ -33,7 +34,14 @@ def ray_caster_depth(env: ManagerBasedRLEnv) -> torch.Tensor:
     )
     * Needs to be flattened if using MLP instead of CNN
     """
-    cam = env.scene["ray_caster_cam"]
-    depth = cam.data.output["distance_to_image_plane"]
-    depth = torch.nan_to_num(depth, nan=cam.cfg.max_distance) / cam.cfg.max_distance
+    asset: Articulation = env.scene[asset_cfg.name] 
+    depth = asset.data.output["distance_to_image_plane"]
+    depth = torch.nan_to_num(depth, nan=asset.cfg.max_distance) / asset.cfg.max_distance
     return depth.reshape(env.num_envs, -1)
+
+
+def ray_caster_lidar(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    sensor = env.scene[asset_cfg.name]
+    distances = torch.norm(sensor.data.ray_hits_w - sensor.data.pos_w.unsqueeze(1), dim=-1)
+    distances = torch.nan_to_num(distances, nan=sensor.cfg.max_distance) / sensor.cfg.max_distance
+    return distances.reshape(env.num_envs, -1)

@@ -1,0 +1,351 @@
+--- git status ---
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/agents/rsl_rl_ppo_cfg.py
+	modified:   BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/__init__.py
+	modified:   BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/curriculum.py
+	modified:   BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/observation.py
+	modified:   BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/rosbot_env_cfg.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.vscode/
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_box/
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_0.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_100.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1000.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1050.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1100.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1150.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1200.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1250.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1300.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1350.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1400.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_1450.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_150.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_200.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_250.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_300.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_350.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_400.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_450.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_50.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_500.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_550.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_600.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_650.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_700.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_750.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_800.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_850.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_900.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_01-14-07/model_950.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_0.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_100.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_1000.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_1050.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_1100.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_1150.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_1200.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_1250.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_1300.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_1350.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_1400.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_1450.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_150.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_200.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_250.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_300.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_350.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_400.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_450.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_50.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_500.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_550.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_600.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_650.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_700.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_750.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_800.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_850.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_900.pt
+	BlindBrigade_IsaacLab/logs/rsl_rl/rosbot_manager/2026-02-09_20-42-50/model_950.pt
+	BlindBrigade_IsaacLab/source/.vscode/
+	BlindBrigade_IsaacLab/source/BlindBrigade_assets/BlindBrigade_assets/robot/rosorin_backup.py
+	BlindBrigade_IsaacLab/source/BlindBrigade_assets/data/mecanum_planar/
+	BlindBrigade_IsaacLab/source/BlindBrigade_assets/data/rosorin_mecanum/
+	BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/rewards.py
+
+no changes added to commit (use "git add" and/or "git commit -a") 
+
+
+--- git diff ---
+diff --git a/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/agents/rsl_rl_ppo_cfg.py b/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/agents/rsl_rl_ppo_cfg.py
+index a6a98b9..bd8472d 100644
+--- a/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/agents/rsl_rl_ppo_cfg.py
++++ b/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/agents/rsl_rl_ppo_cfg.py
+@@ -11,9 +11,9 @@ from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, R
+ @configclass
+ class PPORunnerCfg(RslRlOnPolicyRunnerCfg):
+     num_steps_per_env = 16
+-    max_iterations = 1500
++    max_iterations = 2000
+     save_interval = 50
+-    experiment_name = "rosbot_manager"
++    experiment_name = "rosbot_box"
+     policy = RslRlPpoActorCriticCfg(
+         init_noise_std=1.0,
+         actor_obs_normalization=False,
+diff --git a/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/__init__.py b/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/__init__.py
+index 8ec977f..f5dddc3 100644
+--- a/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/__init__.py
++++ b/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/__init__.py
+@@ -4,5 +4,6 @@ from isaaclab.envs.mdp import *  # noqa: F401, F403
+ 
+ from .observation import *       # noqa: F401, F403
+ from .actions import *           # noqa: F401, F403
++from .rewards import *           # noqa: F401, F403
+ from .curriculum import *        # noqa: F401, F403
+ from .events import *            # noqa: F401, F403
+diff --git a/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/curriculum.py b/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/curriculum.py
+index ae014b5..7c98acd 100644
+--- a/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/curriculum.py
++++ b/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/curriculum.py
+@@ -28,3 +28,25 @@ def terrain_levels_nav(
+ 
+     terrain.update_env_origins(env_ids, move_up, move_down)
+     return torch.mean(terrain.terrain_levels.float())
++
++def terrain_levels_nav_success_based(
++    env: ManagerBasedRLEnv,
++    env_ids: torch.Tensor, 
++    ):                                                                                 
++    terrain = env.scene.terrain
++                                                                                                                    
++    # on first call, initialize buffers
++    if not hasattr(terrain, "_success_count"):
++        terrain._success_count = torch.zeros(env.num_envs, device=env.device)
++
++    # promote/demote based on accumulated successes this episode
++    move_up = terrain._success_count[env_ids] >= 1  # reached near a goal
++    move_down = terrain._success_count[env_ids] == 0  # reached nothing
++    move_down *= ~move_up
++
++    terrain.update_env_origins(env_ids, move_up, move_down)
++
++    # reset counter for envs that just terminated
++    terrain._success_count[env_ids] = 0
++
++    return torch.mean(terrain.terrain_levels.float())
+diff --git a/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/observation.py b/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/observation.py
+index 4c2c1ec..4d7fbbe 100644
+--- a/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/observation.py
++++ b/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/mdp/observation.py
+@@ -21,7 +21,8 @@ def base_yaw_rate(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntit
+     asset: Articulation = env.scene[asset_cfg.name]              
+     return asset.data.root_ang_vel_b[:, 2:3] 
+ 
+-def ray_caster_depth(env: ManagerBasedRLEnv) -> torch.Tensor:
++
++def ray_caster_depth(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("ray_caster_cam")) -> torch.Tensor:
+     """Alternative:
+     ObsTerm(
+         func=mdp.image, clip=(0.0,1.0), 
+@@ -33,7 +34,14 @@ def ray_caster_depth(env: ManagerBasedRLEnv) -> torch.Tensor:
+     )
+     * Needs to be flattened if using MLP instead of CNN
+     """
+-    cam = env.scene["ray_caster_cam"]
+-    depth = cam.data.output["distance_to_image_plane"]
+-    depth = torch.nan_to_num(depth, nan=cam.cfg.max_distance) / cam.cfg.max_distance
++    asset: Articulation = env.scene[asset_cfg.name] 
++    depth = asset.data.output["distance_to_image_plane"]
++    depth = torch.nan_to_num(depth, nan=asset.cfg.max_distance) / asset.cfg.max_distance
+     return depth.reshape(env.num_envs, -1)
++
++
++def ray_caster_lidar(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
++    sensor = env.scene[asset_cfg.name]
++    distances = torch.norm(sensor.data.ray_hits_w - sensor.data.pos_w.unsqueeze(1), dim=-1)
++    distances = torch.nan_to_num(distances, nan=sensor.cfg.max_distance) / sensor.cfg.max_distance
++    return distances.reshape(env.num_envs, -1)
+diff --git a/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/rosbot_env_cfg.py b/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/rosbot_env_cfg.py
+index 2cb9f17..4fb606c 100644
+--- a/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/rosbot_env_cfg.py
++++ b/BlindBrigade_IsaacLab/source/BlindBrigade_tasks/BlindBrigade_tasks/tasks/rosbot/rosbot_env_cfg.py
+@@ -14,6 +14,7 @@ from isaaclab.assets import ArticulationCfg, AssetBaseCfg
+ from isaaclab.sensors import (
+     ContactSensorCfg,
+     RayCasterCameraCfg,
++    RayCasterCfg,
+     patterns
+ )
+ from isaaclab.terrains import (
+@@ -54,7 +55,7 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
+     terrain = TerrainImporterCfg(
+         prim_path="/World/ground",
+         terrain_type="generator",
+-        max_init_terrain_level=None,
++        max_init_terrain_level=0,
+         use_terrain_origins=True,
+         terrain_generator=TerrainGeneratorCfg(
+             size=(8.0, 8.0),
+@@ -122,11 +123,48 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
+             rot=(1.0, 0.0, 0.0, 0.0),
+             convention="world",
+         ),
+-        pattern_cfg=patterns.PinholeCameraPatternCfg(
+-            focal_length=24.0,
+-            horizontal_aperture=20.955,
+-            width=int(64/2),      # low res for speed
+-            height=int(48/2),
++        pattern_cfg=patterns.PinholeCameraPatternCfg(                                                                                                                                               
++            focal_length=2.1,                  
++            horizontal_aperture=6.0,
++            width=32,
++            height=18,  # 16:9 aspect ratio
++        ),
++
++        max_distance=1.0,
++        mesh_prim_paths=["/World/ground"],
++        debug_vis=False,
++    )
++    
++    ray_caster_lidar_left = RayCasterCfg(
++        prim_path="{ENV_REGEX_NS}/Robot/base_link",                                                                       
++        update_period=0.0,
++        offset=RayCasterCfg.OffsetCfg(
++            pos=(0.15, 0.0, 0.08),   # front of robot, slightly above base
++            rot=(0.7071, 0.0, 0.0, 0.7071),
++        ),
++        pattern_cfg=patterns.LidarPatternCfg(
++            channels=1,
++            vertical_fov_range=(0.0, 0.0),
++            horizontal_fov_range=(-45.0, 90.0),
++            horizontal_res=5.0, # ray every 5° → 18 rays
++        ),
++        max_distance=1.0,
++        mesh_prim_paths=["/World/ground"],
++        debug_vis=False,
++    )
++    
++    ray_caster_lidar_right = RayCasterCfg(
++        prim_path="{ENV_REGEX_NS}/Robot/base_link",                                                                       
++        update_period=0.0,
++        offset=RayCasterCfg.OffsetCfg(
++            pos=(0.15, 0.0, 0.08),   # front of robot, slightly above base
++            rot=(0.7071, 0.0, 0.0, -0.7071),
++        ),
++        pattern_cfg=patterns.LidarPatternCfg(
++            channels=1,
++            vertical_fov_range=(0.0, 0.0),
++            horizontal_fov_range=(-90.0, 45.0),
++            horizontal_res=5.0, # ray every 5° → 18 rays
+         ),
+         max_distance=1.0,
+         mesh_prim_paths=["/World/ground"],
+@@ -174,11 +212,26 @@ class ObservationsCfg:
+     @configclass
+     class PolicyCfg(ObsGroup):
+         """Observations for policy group."""
+-        pose_command  = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
+-        base_lin_vel  = ObsTerm(func=mdp.base_lin_vel,       clip=(-1.0,1.0))
+-        base_yaw_rate = ObsTerm(func=mdp.base_yaw_rate,      clip=(-2.0, 2.0))
+-        ray_caster    = ObsTerm(func=mdp.ray_caster_depth,   clip=(0.0,1.0))
+-        last_action   = ObsTerm(func=mdp.last_action,        clip=(-1., 1.))
++        pose_command   = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
++        base_lin_vel   = ObsTerm(func=mdp.base_lin_vel,       clip=(-1.0,1.0))
++        base_yaw_rate  = ObsTerm(func=mdp.base_yaw_rate,      clip=(-2.0, 2.0))
++        ray_caster_cam = ObsTerm(func=mdp.ray_caster_depth,   clip=(0.0,1.0))
++        last_action    = ObsTerm(func=mdp.last_action,        clip=(-1., 1.))
++
++        def __post_init__(self) -> None:
++            self.enable_corruption = False
++            self.concatenate_terms = True
++
++    @configclass
++    class CriticCfg(ObsGroup):
++        """Observations for policy group."""
++        pose_command   = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
++        base_lin_vel   = ObsTerm(func=mdp.base_lin_vel,       clip=(-1.0,1.0))
++        base_yaw_rate  = ObsTerm(func=mdp.base_yaw_rate,      clip=(-2.0, 2.0))
++        ray_caster_cam = ObsTerm(func=mdp.ray_caster_depth,   clip=(0.0,1.0))
++        lidar_left     = ObsTerm(func=mdp.ray_caster_lidar,   clip=(0.0,1.0), params={"asset_cfg": SceneEntityCfg("ray_caster_lidar_left")})
++        lidar_right    = ObsTerm(func=mdp.ray_caster_lidar,   clip=(0.0,1.0), params={"asset_cfg": SceneEntityCfg("ray_caster_lidar_right")})
++        last_action    = ObsTerm(func=mdp.last_action,        clip=(-1., 1.))
+ 
+         def __post_init__(self) -> None:
+             self.enable_corruption = False
+@@ -186,6 +239,7 @@ class ObservationsCfg:
+ 
+     # observation groups
+     policy: PolicyCfg = PolicyCfg()
++    critic: CriticCfg = CriticCfg()
+ 
+ 
+ @configclass
+@@ -204,12 +258,27 @@ class RewardsCfg:
+         weight=0.5,
+         params={"std": 0.2, "command_name": "goal_pose"},
+     )
++    position_tracking_pricision = RewTerm(
++        func=position_command_error_tanh,
++        weight=0.5,
++        params={"std": 0.05, "command_name": "goal_pose"},
++    )
+     orientation_tracking = RewTerm(
+         func=heading_command_error_abs,
+         weight=-0.2,
+         params={"command_name": "goal_pose"},
+     )
+     action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
++    lateral_vel = RewTerm(func=mdp.lateral_velocity_penalty_l2, weight=-0.01)
++
++    # Non-contributing reward term. Used to track success
++    track_success = RewTerm(
++        func=mdp.track_goal_reached, 
++        params={
++            "promote_threshold": 0.1,
++        },
++        weight=0.0
++    )
+     
+ 
+ @configclass
+@@ -243,13 +312,7 @@ class CommandCfg:
+ class CurriculumCfg:
+     """Curriculum for the rosbot"""
+ 
+-    terrain_level = CurriculumTerm(
+-        func=mdp.terrain_levels_nav,
+-        params={
+-            "promote_threshold": 0.1, 
+-            "demote_threshold": 0.2
+-        }
+-    )
++    terrain_level = CurriculumTerm(func=mdp.terrain_levels_nav_success_based)
+ 
+ @configclass
+ class RosbotActionCfg:
+@@ -326,9 +389,12 @@ class RosbotNavFlatTerrainEnvCfg(RosbotNavBoxTerrainEnvCfg):
+         }
+ 
+         # Disables sensors not required for flat single robot env
+-        self.scene.ray_caster_cam = None
++        self.scene.ray_caster_cam_front = None
++        self.scene.ray_caster_cam_left = None
++        self.scene.ray_caster_cam_right = None
+         self.observations.policy.ray_caster = None
+         self.terminations.terrain_contact = None
+         self.curriculum = None
++        self.rewards.lateral_vel = None
+ 
+-    
+\ No newline at end of file
++    mdp.joint_vel_l1 
+\ No newline at end of file
