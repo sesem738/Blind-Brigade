@@ -26,6 +26,14 @@ from isaaclab.terrains import (
 from isaaclab.envs.mdp.terminations import illegal_contact
 from isaaclab_tasks.manager_based.navigation.mdp import position_command_error_tanh, heading_command_error_abs
 from isaaclab.utils import configclass
+from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
+
+# Domain Randomization Considerations: 
+# 1) ~Mass randomization~: Action term sets velocity directly, bypassing dynamics
+# 2) ~Force~ : Ramdomly sets root velocity once, but apply_actions() overwrites root velocity on the very next step
+# 3) Observation noise — add noise to sensor readings (most impactful for sim-to-real)
+# 4) Action noise/delay — simulate motor latency or command imprecision
+# 5) Sensor offset randomization — slight position/rotation offset on ray caster
 
 ##
 # Pre-defined configs
@@ -136,42 +144,57 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
             channels=10, vertical_fov_range=[-30, 10], horizontal_fov_range=[-55, 55], horizontal_res=2.0
         ),
         max_distance=1.0,
-        mesh_prim_paths=["/World/ground", "{ENV_REGEX_NS}/Blind"],
+        mesh_prim_paths=[
+            "/World/ground",
+            MultiMeshRayCasterCfg.RaycastTargetCfg(
+                prim_expr="{ENV_REGEX_NS}/Blind/base_link/collisions", track_mesh_transforms=True
+            ),
+        ],
         debug_vis=False,
     )
-    
+
     guide_ray_caster_lidar_blind_side = MultiMeshRayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Guide/base_link",                                                                       
+        prim_path="{ENV_REGEX_NS}/Guide/base_link",
         update_period=0.0,
         offset=MultiMeshRayCasterCfg.OffsetCfg(
             pos=(0.0, 0.0, 0.08),
             rot=(0.0, 0.0, 0.0, 1.0),
         ),
         pattern_cfg=patterns.LidarPatternCfg(
-            channels=1,
-            vertical_fov_range=(-5, 0.0),
+            channels=5,
+            vertical_fov_range=(-10, 0.0),
             horizontal_fov_range=(-135.0, 135.0),
             horizontal_res=5.0,
         ),
         max_distance=1.0,
-        mesh_prim_paths=["/World/ground", "{ENV_REGEX_NS}/Blind"],
+        mesh_prim_paths=[
+            "/World/ground",
+            MultiMeshRayCasterCfg.RaycastTargetCfg(
+                prim_expr="{ENV_REGEX_NS}/Blind/base_link/collisions", track_mesh_transforms=True
+            ),
+        ],
         debug_vis=False,
     )
 
     blind_ray_caster_lidar_blind_side = MultiMeshRayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Blind/base_link",                                                                       
+        prim_path="{ENV_REGEX_NS}/Blind/base_link",
         update_period=0.0,
         offset=MultiMeshRayCasterCfg.OffsetCfg(
             pos=(0.0, 0.0, 0.08),
         ),
         pattern_cfg=patterns.LidarPatternCfg(
             channels=1,
-            vertical_fov_range=(-5, 0.0),
+            vertical_fov_range=(-10, 0.0),
             horizontal_fov_range=(-180.0, 180.0),
             horizontal_res=5.0,
         ),
         max_distance=1.0,
-        mesh_prim_paths=["/World/ground", "{ENV_REGEX_NS}/Guide"],
+        mesh_prim_paths=[
+            "/World/ground",
+            MultiMeshRayCasterCfg.RaycastTargetCfg(
+                prim_expr="{ENV_REGEX_NS}/Guide/base_link/collisions", track_mesh_transforms=True
+            ),
+        ],
         debug_vis=False,
     )
     
@@ -180,7 +203,7 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         super().__post_init__()
         self.filter_collisions = True
         self.guide.init_state = self.guide.init_state.replace(pos=(0.0, 0.0, 0.01))
-        self.blind.init_state = self.blind.init_state.replace(pos=(1.0, 1.0, 0.01))
+        self.blind.init_state = self.blind.init_state.replace(pos=(1.0, 0.0, 0.01))
 
         # 25 x 25 = 625 subterrains
         self.terrain.terrain_generator.num_rows = 25
@@ -208,7 +231,6 @@ class EventCfg:
         },
     )
 
-
 @configclass
 class ObservationsCfg:
     """Observation specifications for the MDP."""
@@ -217,13 +239,13 @@ class ObservationsCfg:
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
         pose_command   = ObsTerm(func=mdp.generated_commands,                params={"command_name": "goal_pose"})
-        guide_lin_vel  = ObsTerm(func=mdp.base_lin_vel,     clip=(-1.0,1.0), params={"asset_cfg": SceneEntityCfg("guide")})
-        guide_yaw_rate = ObsTerm(func=mdp.base_yaw_rate,    clip=(-2.0, 2.0),params={"asset_cfg": SceneEntityCfg("guide")})
-        guide_ray_cam  = ObsTerm(func=mdp.ray_caster_lidar, clip=(0.0,1.0),  params={"asset_cfg": SceneEntityCfg("guide_ray_caster_cam")})
+        guide_lin_vel  = ObsTerm(func=mdp.base_lin_vel,     clip=(-1.0,1.0), noise=Unoise(n_min=-0.05, n_max=0.05), params={"asset_cfg": SceneEntityCfg("guide")})
+        guide_yaw_rate = ObsTerm(func=mdp.base_yaw_rate,    clip=(-2.0, 2.0),noise=Unoise(n_min=-0.01, n_max=0.01), params={"asset_cfg": SceneEntityCfg("guide")})
+        guide_ray_cam  = ObsTerm(func=mdp.ray_caster_lidar, clip=(0.0,1.0),  noise=Unoise(n_min=-0.01, n_max=0.01), params={"asset_cfg": SceneEntityCfg("guide_ray_caster_cam")})
         last_action    = ObsTerm(func=mdp.last_action,      clip=(-1.0, 1.0))
 
         def __post_init__(self) -> None:
-            self.enable_corruption = False
+            self.enable_corruption = True
             self.concatenate_terms = True
 
     @configclass
@@ -237,7 +259,7 @@ class ObservationsCfg:
         guide_ray_cam   = ObsTerm(func=mdp.ray_caster_lidar, clip=(0.0,1.0),  params={"asset_cfg": SceneEntityCfg("guide_ray_caster_cam")})
         guide_blindside = ObsTerm(func=mdp.ray_caster_lidar, clip=(0.0,1.0),  params={"asset_cfg": SceneEntityCfg("guide_ray_caster_lidar_blind_side")})
         blind_blindside = ObsTerm(func=mdp.ray_caster_lidar, clip=(0.0,1.0),  params={"asset_cfg": SceneEntityCfg("blind_ray_caster_lidar_blind_side")})
-        last_action     = ObsTerm(func=mdp.last_action,        clip=(-1.0, 1.0))
+        last_action     = ObsTerm(func=mdp.last_action,      clip=(-1.0, 1.0))
 
         def __post_init__(self) -> None:
             self.enable_corruption = False
