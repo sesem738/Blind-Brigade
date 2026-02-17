@@ -1,3 +1,33 @@
+"""
+Task description
+
+Task: Blind must reach its goal. Guide helps it get there safely.
+
+Information design:
+
+  ┌──────────────┬──────────────────────────────────────────────────┬────────────────────────────────────────────┐                                  
+  │              │                  Guide (policy)                  │               Blind (policy)               │
+  ├──────────────┼──────────────────────────────────────────────────┼────────────────────────────────────────────┤
+  │ Blind's goal │ relative to guide (so guide knows where to lead) │ not observed                               │
+  ├──────────────┼──────────────────────────────────────────────────┼────────────────────────────────────────────┤
+  │ Partner      │ front ray caster                                 │ nothing                                    │
+  ├──────────────┼──────────────────────────────────────────────────┼────────────────────────────────────────────┤
+  │ Obstacles    │ front ray caster                                 │ nothing                                    │
+  ├──────────────┼──────────────────────────────────────────────────┼────────────────────────────────────────────┤
+  │ Self         │ lin_vel, yaw_rate                                │ nothing                                    │
+  └──────────────┴──────────────────────────────────────────────────┴────────────────────────────────────────────┘
+
+  The blind should not observe its own goal delta — otherwise it doesn't need the guide. The blind only sees the guide's
+  relative position and learns to follow it. The guide sees everything: the blind's goal, the blind's position, and the 
+  obstacles. The guide's job is to position itself such that the blind can follow it to the goal safely.
+
+Reward: Both robots share the reward when the blind reaches the goal. Guide gets additional reward for staying near the 
+blind (so it doesn't just run to the goal alone).
+
+Leader-follower dependency:
+  Goal → Guide (sees goal + obstacles + blind) → positions itself → Blind (sees only guide) → follows
+"""
+
 import isaaclab.sim as sim_utils
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import (
@@ -237,8 +267,8 @@ class ObservationsCfg:
 
     @configclass
     class PolicyCfg(ObsGroup):
-        """Observations for policy group."""
-        pose_command   = ObsTerm(func=mdp.generated_commands,                params={"command_name": "goal_pose"})
+        """Observations for policy group — everything from guide's perspective."""
+        blind_goal     = ObsTerm(func=mdp.blind_goal_relative_to_guide,      params={"command_name": "goal_pose", "guide_cfg": SceneEntityCfg("guide")})
         guide_lin_vel  = ObsTerm(func=mdp.base_lin_vel,     clip=(-1.0,1.0), noise=Unoise(n_min=-0.05, n_max=0.05), params={"asset_cfg": SceneEntityCfg("guide")})
         guide_yaw_rate = ObsTerm(func=mdp.base_yaw_rate,    clip=(-2.0, 2.0),noise=Unoise(n_min=-0.01, n_max=0.01), params={"asset_cfg": SceneEntityCfg("guide")})
         guide_ray_cam  = ObsTerm(func=mdp.ray_caster_lidar, clip=(0.0,1.0),  noise=Unoise(n_min=-0.01, n_max=0.01), params={"asset_cfg": SceneEntityCfg("guide_ray_caster_cam")})
@@ -336,7 +366,7 @@ class CommandCfg:
     """Commands for the rosbot."""
 
     goal_pose = TerrainBasedPose2dCommandCfg(
-        asset_name="guide",
+        asset_name="blind",
         ranges=TerrainBasedPose2dCommandCfg.Ranges(
             heading=(-3.14, 3.14),
         ),
@@ -453,6 +483,13 @@ class RosbotCoopNavFlatTerrainEnvCfg(RosbotCoopNavBoxTerrainEnvCfg):
         }
 
         # Disables sensors not required for flat single robot env
+        self.curriculum = None
+        self.rewards.track_success = None
+
+@configclass
+class RosbotCoopNavFlatTerrainEnvPLAYCfg(RosbotCoopNavFlatTerrainEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
         self.scene.guide_ray_caster_cam.debug_vis = True
         self.scene.guide_ray_caster_lidar_blind_side.debug_vis = True
         self.scene.blind_ray_caster_lidar_blind_side.debug_vis = True

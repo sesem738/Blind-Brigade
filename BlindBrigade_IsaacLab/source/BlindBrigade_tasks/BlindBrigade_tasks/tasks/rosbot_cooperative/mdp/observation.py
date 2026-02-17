@@ -49,6 +49,37 @@ def ray_caster_depth_cropped(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg =
       return depth.reshape(env.num_envs, -1)
 
 
+def blind_goal_relative_to_guide(
+    env: ManagerBasedRLEnv,
+    command_name: str = "goal_pose",
+    guide_cfg: SceneEntityCfg = SceneEntityCfg("guide"),
+) -> torch.Tensor:
+    """Returns the blind robot's goal position expressed in the guide's body frame.
+
+    The command is generated for the blind (asset_name="blind" in CommandCfg),
+    but transformed into the guide's local frame so the guide policy can navigate toward it.
+
+    Returns:
+        Tensor of shape (num_envs, 3) — [dx, dy, dz] in guide's body frame.
+    """
+    from isaaclab.utils.math import quat_apply_inverse, yaw_quat
+
+    # goal in world frame (set by the command targeting the blind)
+    command = env.command_manager.get_term(command_name)
+    goal_pos_w = command.pos_command_w  # (num_envs, 3)
+
+    # guide's root state
+    guide: Articulation = env.scene[guide_cfg.name]
+    guide_pos_w = guide.data.root_pos_w[:, :3]
+    guide_quat_w = guide.data.root_quat_w
+
+    # transform goal into guide's body frame
+    delta_w = goal_pos_w - guide_pos_w
+    delta_b = quat_apply_inverse(yaw_quat(guide_quat_w), delta_w)
+
+    return delta_b
+
+
 def ray_caster_lidar(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
     sensor = env.scene[asset_cfg.name]
     distances = torch.norm(sensor.data.ray_hits_w - sensor.data.pos_w.unsqueeze(1), dim=-1)
