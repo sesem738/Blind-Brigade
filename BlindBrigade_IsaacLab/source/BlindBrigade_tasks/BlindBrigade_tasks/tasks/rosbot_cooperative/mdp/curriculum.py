@@ -60,8 +60,10 @@ def terrain_levels_nav_success_based(
 
     terrain.update_env_origins(env_ids, move_up, move_down)
 
-    # reset counters for envs that just terminated
-    terrain._success_count[env_ids] = 0
-    terrain._was_near_goal[env_ids] = 0
+    # reset counters only on collision or promotion — keep counting across timeouts
+    reset_mask = collision_death | move_up
+    reset_ids = env_ids[reset_mask]
+    terrain._success_count[reset_ids] = 0
+    terrain._was_near_goal[reset_ids] = 0
 
     return torch.mean(terrain.terrain_levels.float())

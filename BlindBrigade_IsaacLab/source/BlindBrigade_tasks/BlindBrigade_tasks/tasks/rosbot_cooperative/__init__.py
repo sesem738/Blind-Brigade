@@ -11,7 +11,7 @@ gym.register(
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": f"{__name__}.rosbot_env_cfg:RosbotCoopNavFlatTerrainEnvCfg",
+        "env_cfg_entry_point": f"{__name__}.rosbot_coop_env_cfg:RosbotCoopNavFlatTerrainEnvCfg",
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerFlatCfg",
     },
 )
@@ -21,7 +21,7 @@ gym.register(
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": f"{__name__}.rosbot_env_cfg:RosbotCoopNavFlatTerrainEnvPLAYCfg",
+        "env_cfg_entry_point": f"{__name__}.rosbot_coop_env_cfg:RosbotCoopNavFlatTerrainEnvPLAYCfg",
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerFlatCfg",
     },
 )
@@ -31,7 +31,7 @@ gym.register(
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": f"{__name__}.rosbot_env_cfg:RosbotCoopNavBoxTerrainEnvCfg",
+        "env_cfg_entry_point": f"{__name__}.rosbot_coop_env_cfg:RosbotCoopNavBoxTerrainEnvCfg",
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerBoxCfg",
     },
 )
@@ -41,7 +41,7 @@ gym.register(
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": f"{__name__}.rosbot_env_cfg:RosbotCoopNavBoxTerrainEnvPLAYCfg",
+        "env_cfg_entry_point": f"{__name__}.rosbot_coop_env_cfg:RosbotCoopNavBoxTerrainEnvPLAYCfg",
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerBoxCfg",
     },
 )
