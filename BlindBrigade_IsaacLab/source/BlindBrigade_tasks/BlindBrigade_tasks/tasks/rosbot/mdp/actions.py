@@ -138,3 +138,91 @@ class SE2BaseMecanumDriveCfg(ActionTermCfg):
 
     # If True: also spin wheels; if False: only move base
     animate_wheels: bool = True
+
+
+class DifferentialDrive(ActionTerm):
+    """Differential drive action term. 2D action space: (vx, wz). No lateral movement."""
+
+    cfg: DifferentialDriveCfg
+    _asset: Articulation
+
+    def __init__(self, cfg: DifferentialDriveCfg, env: ManagerBasedRLEnv):
+        super().__init__(cfg, env)
+        self._asset = env.scene[cfg.asset_name]
+        self._wheel_joint_ids, _ = self._asset.find_joints(list(cfg.wheel_joints))
+
+    @property
+    def action_dim(self) -> int:
+        return 2
+
+    @property
+    def raw_actions(self) -> torch.Tensor:
+        return self._raw_actions
+
+    @property
+    def processed_actions(self) -> torch.Tensor:
+        return self._processed_actions
+
+    def process_actions(self, actions: torch.Tensor):
+        self._raw_actions = actions.clone()
+        scaled = actions * torch.tensor([self.cfg.max_vx, self.cfg.max_wz], device=self.device)
+        self._processed_actions = torch.clamp(
+            scaled,
+            min=torch.tensor([-self.cfg.max_vx, -self.cfg.max_wz], device=self.device),
+            max=torch.tensor([self.cfg.max_vx, self.cfg.max_wz], device=self.device),
+        )
+
+    def apply_actions(self):
+        vx = self._processed_actions[:, 0]
+        wz = self._processed_actions[:, 1]
+
+        if self.cfg.animate_wheels:
+            r = self.cfg.wheel_radius
+            L = self.cfg.half_track
+
+            # Differential drive kinematics: left wheels same speed, right wheels same speed
+            w_left = (vx - L * wz) / r
+            w_right = (vx + L * wz) / r
+
+            w_left = torch.clamp(w_left, -self.cfg.max_wheel_speed, self.cfg.max_wheel_speed)
+            w_right = torch.clamp(w_right, -self.cfg.max_wheel_speed, self.cfg.max_wheel_speed)
+
+            # fl, fr, rl, rr
+            wheel_vel_targets = torch.stack([w_left, w_right, w_left, w_right], dim=-1)
+            self._asset.set_joint_velocity_target(wheel_vel_targets, joint_ids=self._wheel_joint_ids)
+
+        root_vel = self._asset.data.root_vel_w.clone()
+
+        root_vel[:, :2] = quat_apply(
+            self._asset.data.root_quat_w,
+            torch.stack((vx, torch.zeros_like(vx), torch.zeros_like(vx)), dim=-1)
+        )[:, :2]
+
+        root_vel[:, 5] = quat_apply(
+            self._asset.data.root_quat_w,
+            torch.stack((torch.zeros_like(wz), torch.zeros_like(wz), wz), dim=-1)
+        )[:, 2]
+
+        self._asset.write_root_velocity_to_sim(root_vel)
+
+    def reset(self, env_ids: torch.Tensor | None = None):
+        if env_ids is None:
+            env_ids = torch.arange(self.num_envs, device=self.device)
+
+
+@configclass
+class DifferentialDriveCfg(ActionTermCfg):
+    class_type: type = DifferentialDrive
+    asset_name: str = "robot"
+
+    wheel_radius: float = 0.05
+    half_track: float = 0.105
+
+    wheel_joints: tuple[str, str, str, str] = (
+        "fl_wheel_joint", "fr_wheel_joint", "rl_wheel_joint", "rr_wheel_joint"
+    )
+
+    max_vx: float = 1.0
+    max_wz: float = 2.0
+    max_wheel_speed: float = 60.0
+    animate_wheels: bool = True

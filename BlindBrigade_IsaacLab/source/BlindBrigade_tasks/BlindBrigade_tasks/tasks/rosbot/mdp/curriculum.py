@@ -31,22 +31,37 @@ def terrain_levels_nav(
 
 def terrain_levels_nav_success_based(
     env: ManagerBasedRLEnv,
-    env_ids: torch.Tensor, 
-    ):                                                                                 
+    env_ids: torch.Tensor,
+    min_successes: int = 3,
+    ):
+    """Curriculum based on goal-reaching success count.
+
+    Promote: reached enough goals AND survived (no collision death).
+    Demote: collision death OR reached no goals.
+    """
     terrain = env.scene.terrain
-                                                                                                                    
+
     # on first call, initialize buffers
     if not hasattr(terrain, "_success_count"):
         terrain._success_count = torch.zeros(env.num_envs, device=env.device)
+        terrain._was_near_goal = torch.zeros(env.num_envs, device=env.device)
 
-    # promote/demote based on accumulated successes this episode
-    move_up = terrain._success_count[env_ids] >= 1  # reached near a goal
-    move_down = terrain._success_count[env_ids] == 0  # reached nothing
+    # check if terminated by collision (not timeout)
+    collision_death = (
+        env.termination_manager.terminated[env_ids]
+        & ~env.termination_manager.time_outs[env_ids]
+    )
+
+    # promote: reached enough goals AND did not die from collision
+    move_up = (terrain._success_count[env_ids] >= min_successes) & ~collision_death
+    # demote: collision death OR reached nothing
+    move_down = collision_death | (terrain._success_count[env_ids] == 0)
     move_down *= ~move_up
 
     terrain.update_env_origins(env_ids, move_up, move_down)
 
-    # reset counter for envs that just terminated
+    # reset counters for envs that just terminated
     terrain._success_count[env_ids] = 0
+    terrain._was_near_goal[env_ids] = 0
 
     return torch.mean(terrain.terrain_levels.float())

@@ -13,7 +13,6 @@ from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.sensors import (
     ContactSensorCfg,
-    RayCasterCameraCfg,
     RayCasterCfg,
     patterns
 )
@@ -59,7 +58,8 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         use_terrain_origins=True,
         terrain_generator=TerrainGeneratorCfg(
             size=(8.0, 8.0),
-            border_width=20.0,
+            border_width=1.0,
+            border_height=0.1,
             horizontal_scale=0.1,
             vertical_scale=0.005,
             slope_threshold=0.75,
@@ -95,7 +95,7 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         visual_material=sim_utils.PreviewSurfaceCfg(
             diffuse_color=(0.0, 0.0, 0.0),
         ),
-        debug_vis=True,
+        debug_vis=False,
     )
 
     light = AssetBaseCfg(
@@ -114,38 +114,31 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         history_length=1,
     )
 
-    ray_caster_cam = RayCasterCameraCfg(
+    ray_caster_cam = RayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base_link",                                                                       
         update_period=0.0,
-        data_types=["distance_to_image_plane"],
-        offset=RayCasterCameraCfg.OffsetCfg(
+        offset=RayCasterCfg.OffsetCfg(
             pos=(0.15, 0.0, 0.08),   # front of robot, slightly above base
-            rot=(1.0, 0.0, 0.0, 0.0),
-            convention="world",
         ),
-        pattern_cfg=patterns.PinholeCameraPatternCfg(                                                                                                                                               
-            focal_length=2.1,                  
-            horizontal_aperture=6.0,
-            width=32,
-            height=18,  # 16:9 aspect ratio
+        pattern_cfg=patterns.LidarPatternCfg(
+            channels=10, vertical_fov_range=[-30, 10], horizontal_fov_range=[-55, 55], horizontal_res=2.0
         ),
-
         max_distance=1.0,
         mesh_prim_paths=["/World/ground"],
         debug_vis=False,
     )
     
-    ray_caster_lidar_left = RayCasterCfg(
+    ray_caster_lidar_blind_side = RayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base_link",                                                                       
         update_period=0.0,
         offset=RayCasterCfg.OffsetCfg(
             pos=(0.15, 0.0, 0.08),   # front of robot, slightly above base
-            rot=(0.7071, 0.0, 0.0, 0.7071),
+            rot=(0.0, 0.0, 0.0, 1.0),
         ),
         pattern_cfg=patterns.LidarPatternCfg(
             channels=1,
-            vertical_fov_range=(0.0, 0.0),
-            horizontal_fov_range=(-45.0, 90.0),
+            vertical_fov_range=(-5, 0.0),
+            horizontal_fov_range=(-125.0, 125.0),
             horizontal_res=5.0, # ray every 5° → 18 rays
         ),
         max_distance=1.0,
@@ -153,24 +146,6 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         debug_vis=False,
     )
     
-    ray_caster_lidar_right = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/base_link",                                                                       
-        update_period=0.0,
-        offset=RayCasterCfg.OffsetCfg(
-            pos=(0.15, 0.0, 0.08),   # front of robot, slightly above base
-            rot=(0.7071, 0.0, 0.0, -0.7071),
-        ),
-        pattern_cfg=patterns.LidarPatternCfg(
-            channels=1,
-            vertical_fov_range=(0.0, 0.0),
-            horizontal_fov_range=(-90.0, 45.0),
-            horizontal_res=5.0, # ray every 5° → 18 rays
-        ),
-        max_distance=1.0,
-        mesh_prim_paths=["/World/ground"],
-        debug_vis=False,
-    )
-
     def __post_init__(self):
         """Post intialization."""
         super().__post_init__()
@@ -178,10 +153,8 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         self.robot.init_state = self.robot.init_state.replace(pos=(0.0, 0.0, 0.01))
 
         # 25 x 25 = 625 subterrains
-        # self.terrain.terrain_generator.num_rows = 25
-        # self.terrain.terrain_generator.num_cols = 25
-        self.terrain.terrain_generator.num_rows = 3    # Only use for debugging
-        self.terrain.terrain_generator.num_cols = 3
+        self.terrain.terrain_generator.num_rows = 25
+        self.terrain.terrain_generator.num_cols = 25
 
 
 #####################################################################
@@ -215,8 +188,8 @@ class ObservationsCfg:
         pose_command   = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
         base_lin_vel   = ObsTerm(func=mdp.base_lin_vel,       clip=(-1.0,1.0))
         base_yaw_rate  = ObsTerm(func=mdp.base_yaw_rate,      clip=(-2.0, 2.0))
-        ray_caster_cam = ObsTerm(func=mdp.ray_caster_depth,   clip=(0.0,1.0))
-        last_action    = ObsTerm(func=mdp.last_action,        clip=(-1., 1.))
+        ray_caster_cam = ObsTerm(func=mdp.ray_caster_lidar,   clip=(0.0,1.0), params={"asset_cfg": SceneEntityCfg("ray_caster_cam")})
+        last_action    = ObsTerm(func=mdp.last_action,        clip=(-1.0, 1.0))
 
         def __post_init__(self) -> None:
             self.enable_corruption = False
@@ -228,10 +201,9 @@ class ObservationsCfg:
         pose_command   = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
         base_lin_vel   = ObsTerm(func=mdp.base_lin_vel,       clip=(-1.0,1.0))
         base_yaw_rate  = ObsTerm(func=mdp.base_yaw_rate,      clip=(-2.0, 2.0))
-        ray_caster_cam = ObsTerm(func=mdp.ray_caster_depth,   clip=(0.0,1.0))
-        lidar_left     = ObsTerm(func=mdp.ray_caster_lidar,   clip=(0.0,1.0), params={"asset_cfg": SceneEntityCfg("ray_caster_lidar_left")})
-        lidar_right    = ObsTerm(func=mdp.ray_caster_lidar,   clip=(0.0,1.0), params={"asset_cfg": SceneEntityCfg("ray_caster_lidar_right")})
-        last_action    = ObsTerm(func=mdp.last_action,        clip=(-1., 1.))
+        ray_caster_cam = ObsTerm(func=mdp.ray_caster_lidar,   clip=(0.0,1.0), params={"asset_cfg": SceneEntityCfg("ray_caster_cam")})
+        lidar_left     = ObsTerm(func=mdp.ray_caster_lidar,   clip=(0.0,1.0), params={"asset_cfg": SceneEntityCfg("ray_caster_lidar_blind_side")})
+        last_action    = ObsTerm(func=mdp.last_action,        clip=(-1.0, 1.0))
 
         def __post_init__(self) -> None:
             self.enable_corruption = False
@@ -247,7 +219,9 @@ class RewardsCfg:
     """Reward terms for the MDP."""
     # Add mdp.undesired_contacts for collision reward, if required. Skipped here.
 
-    terminating = RewTerm(func=mdp.is_terminated, weight=-400.0)
+    # is_alive = RewTerm(func=mdp.is_alive, weight=-0.05)
+    # goal_distance = RewTerm(func=mdp.goal_distance_penalty, weight=-0.2)
+    terminating = RewTerm(func=mdp.is_terminated, weight=-100.0)
     position_tracking = RewTerm(
         func=position_command_error_tanh,
         weight=0.5,
@@ -258,7 +232,7 @@ class RewardsCfg:
         weight=0.5,
         params={"std": 0.2, "command_name": "goal_pose"},
     )
-    position_tracking_pricision = RewTerm(
+    position_tracking_precision = RewTerm(
         func=position_command_error_tanh,
         weight=0.5,
         params={"std": 0.05, "command_name": "goal_pose"},
@@ -269,15 +243,15 @@ class RewardsCfg:
         params={"command_name": "goal_pose"},
     )
     action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
-    lateral_vel = RewTerm(func=mdp.lateral_velocity_penalty_l2, weight=-0.01)
+    blind_spot_vel = RewTerm(func=mdp.blind_spot_velocity_penalty, weight=-0.2)
 
     # Non-contributing reward term. Used to track success
     track_success = RewTerm(
         func=mdp.track_goal_reached, 
         params={
-            "promote_threshold": 0.1,
+            "promote_threshold": 0.05,
         },
-        weight=0.0
+        weight=1.0
     )
     
 
@@ -303,7 +277,7 @@ class CommandCfg:
         ranges=TerrainBasedPose2dCommandCfg.Ranges(
             heading=(-3.14, 3.14),
         ),
-        resampling_time_range=(10.0, 10.0),
+        resampling_time_range=(5.0, 5.0),
         simple_heading=False,
         debug_vis=True,
     )
@@ -323,7 +297,17 @@ class RosbotActionCfg:
         half_wheelbase=0.125,   
         half_track=0.105,       
         o_pattern=False,        
-        animate_wheels=True,
+        animate_wheels=False,
+    )
+
+@configclass
+class RosbotDifferetialActionCfg:
+    """Actions for the rosbot."""
+
+    base_twist: mdp.DifferentialDriveCfg = mdp.DifferentialDriveCfg(                                                                              
+        wheel_radius=0.05,                                                                                                                        
+        half_track=0.105,                                                                                                                         
+        animate_wheels=False,
     )
 
 
@@ -360,7 +344,7 @@ class RosbotNavBoxTerrainEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 3 # 40 Hz
-        self.episode_length_s = 15
+        self.episode_length_s = 20
         # viewer settings
         self.viewer.eye = (8.0, 0.0, 5.0)
         # simulation settings
@@ -368,6 +352,41 @@ class RosbotNavBoxTerrainEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.render_interval = self.decimation
         self.sim.physx.gpu_max_rigid_patch_count = 200000 # For large number for flat patches
 
+
+@configclass
+class RosbotNavBoxTerrainEnvPLAYCfg(RosbotNavBoxTerrainEnvCfg):
+    """
+    Play config for RosbotNavFlatTerrainEnvCfg
+    """
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.terrain.max_init_terrain_level = 2
+        self.scene.terrain.terrain_generator.num_rows = 3
+        self.scene.terrain.terrain_generator.num_cols = 3
+        self.scene.ray_caster_cam.debug_vis = True
+        self.scene.ray_caster_lidar_blind_side.debug_vis = True
+        self.scene.terrain.debug_vis = True
+        self.actions.base_twist.animate_wheels = True
+
+
+@configclass
+class RosbotNavBoxTerrainDiffEnvCfg(RosbotNavBoxTerrainEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        self.actions : RosbotDifferetialActionCfg = RosbotDifferetialActionCfg()
+
+
+@configclass
+class RosbotNavBoxTerrainDiffEnvPLAYCfg(RosbotNavBoxTerrainDiffEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.terrain.max_init_terrain_level = 2
+        self.scene.terrain.terrain_generator.num_rows = 3
+        self.scene.terrain.terrain_generator.num_cols = 3
+        self.scene.ray_caster_cam.debug_vis = True
+        self.scene.ray_caster_lidar_blind_side.debug_vis = True
+        self.scene.terrain.debug_vis = True
+        self.actions.base_twist.animate_wheels = True
 
 @configclass
 class RosbotNavFlatTerrainEnvCfg(RosbotNavBoxTerrainEnvCfg):
@@ -397,4 +416,11 @@ class RosbotNavFlatTerrainEnvCfg(RosbotNavBoxTerrainEnvCfg):
         self.curriculum = None
         self.rewards.lateral_vel = None
 
-    mdp.joint_vel_l1 
+@configclass
+class RosbotNavFlatTerrainEnvPLAYCfg(RosbotNavFlatTerrainEnvCfg):
+    """
+    This is a test environment. Designed to test & train RosbotNavBoxTerrainEnvCfg on flat terrain.
+    """
+    
+    def __post_init__(self):
+        super().__post_init__()
