@@ -25,7 +25,7 @@ Reward: Both robots share the reward when the blind reaches the goal. Guide gets
 blind (so it doesn't just run to the goal alone).
 
 Leader-follower dependency:
-  Goal → Guide (sees goal + obstacles + blind) → positions itself → Blind (sees only guide) → follows
+  Goal → Guide (sees goal + obstacles + blind) → positions itself → Blind → follows
 """
 
 import isaaclab.sim as sim_utils
