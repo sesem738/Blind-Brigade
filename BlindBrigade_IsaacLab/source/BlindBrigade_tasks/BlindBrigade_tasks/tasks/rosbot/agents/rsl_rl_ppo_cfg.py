@@ -13,12 +13,12 @@ class PPORunnerBoxCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 16
     max_iterations = 2000
     save_interval = 50
-    experiment_name = "rosbot_box"
+    experiment_name = "box_reward_trials"
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,
         actor_obs_normalization=False,
         critic_obs_normalization=False,
-        actor_hidden_dims=[128, 64],
+        actor_hidden_dims=[254, 64],
         critic_hidden_dims=[128, 64],
         activation="elu",
     )

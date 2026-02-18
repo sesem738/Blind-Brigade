@@ -75,3 +75,27 @@ def goal_distance_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize distance to goal. Normalized by terrain tile size."""                                                                             
     command = env.command_manager.get_command("goal_pose")                                                                                        
     return torch.norm(command[:, :2], dim=1)
+
+
+def heading_velocity_alignment(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    min_speed: float = 0.05,
+) -> torch.Tensor:
+    """Penalize misalignment between heading and velocity direction.
+
+    In body frame, perfect alignment means all velocity is along +x.
+    The penalty is |atan2(vy, vx)| / pi, normalized to [0, 1].
+    Only applied when the robot is actually moving (above min_speed).
+    """
+    asset: Articulation = env.scene[asset_cfg.name]
+    vel_b = asset.data.root_lin_vel_b[:, :2]
+    vx = vel_b[:, 0]
+    vy = vel_b[:, 1]
+
+    speed = torch.norm(vel_b, dim=1)
+    angle_error = torch.abs(torch.atan2(vy, vx))  # 0 when moving forward, pi when backward
+
+    # only penalize when actually moving
+    moving = (speed > min_speed).float()
+    return moving * (angle_error / torch.pi)

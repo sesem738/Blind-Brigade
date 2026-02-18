@@ -243,7 +243,12 @@ class RewardsCfg:
         params={"command_name": "goal_pose"},
     )
     action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
+
+    # Make Agent Look Where It is Going
     blind_spot_vel = RewTerm(func=mdp.blind_spot_velocity_penalty, weight=-0.2)
+    heading_vel_align = RewTerm(func=mdp.heading_velocity_alignment, weight=-0.3)
+
+
 
     # Non-contributing reward term. Used to track success
     track_success = RewTerm(
@@ -253,6 +258,8 @@ class RewardsCfg:
         },
         weight=1.0
     )
+
+
     
 
 @configclass
