@@ -14,6 +14,7 @@ from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.sensors import (
     ContactSensorCfg,
     RayCasterCfg,
+    CameraCfg,
     patterns
 )
 from isaaclab.terrains import (
@@ -112,6 +113,26 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/Robot/base_link",
         update_period=0.0,
         history_length=1,
+    )
+
+    guide_zed2_camera: CameraCfg = CameraCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/base_link/zed2_camera",
+        update_period=1.0 / 30.0,  # 30 Hz, matching ZED 2 HD1080 mode
+        data_types=["depth"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=2.12,           # mm
+            horizontal_aperture=6.05,    # mm  2 × 2.12 × tan(110/2°) ≈ 6.05 mm
+            vertical_aperture=2.97,      # mm  2 × 2.12 × tan(70/2°) ≈ 6.05 mm
+            clipping_range=(0.3, 20.0),  # metres — ZED 2 depth range,
+            f_stop=1.06,
+        ),
+        width=662, #low res (662x376) @15/30/60/100fps binning 4x4 mode per camera
+        height=376,
+        offset=CameraCfg.OffsetCfg(
+            pos=(0.17, 0.0, 0.15),   # 170 mm forward, centred, 150 mm up
+            rot=(0.5, -0.5, 0.5, -0.5),  # rotate so camera faces +X (forward)
+            convention="ros",
+        ),
     )
 
     ray_caster_cam = RayCasterCfg(
