@@ -3,9 +3,37 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+from dataclasses import MISSING as _MISSING
+
 from isaaclab.utils import configclass
 
 from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, RslRlPpoAlgorithmCfg
+
+
+@configclass
+class RslRlActorCriticCNNCfg(RslRlPpoActorCriticCfg):
+    """Policy config for ActorCriticCNN — compatible with rsl_rl.modules.ActorCriticCNN.
+
+    When agent_cfg.to_dict() is called, nested @configclass instances are recursively
+    converted to dicts. ActorCriticCNN.__init__ receives actor_cnn_cfg as a plain dict
+    and applies it as CNN kwargs.
+    """
+
+    @configclass
+    class CNNCfg:
+        """Maps 1-to-1 to rsl_rl.networks.CNN kwargs (except input_dim/input_channels, auto-filled)."""
+
+        output_channels: list = _MISSING
+        kernel_size: list | int = _MISSING
+        stride: list | int = 1
+        padding: str = "none"
+        activation: str = "elu"
+        max_pool: list | bool = False
+        global_pool: str = "none"
+
+    class_name: str = "ActorCriticCNN"
+    actor_cnn_cfg: CNNCfg = _MISSING
+    critic_cnn_cfg: CNNCfg = _MISSING
 
 
 @configclass
@@ -50,6 +78,147 @@ class PPORunnerFlatCfg(RslRlOnPolicyRunnerCfg):
         actor_hidden_dims=[128, 64],
         critic_hidden_dims=[128, 64],
         activation="elu",
+    )
+    algorithm = RslRlPpoAlgorithmCfg(
+        value_loss_coef=1.0,
+        use_clipped_value_loss=True,
+        clip_param=0.2,
+        entropy_coef=0.005,
+        num_learning_epochs=5,
+        num_mini_batches=4,
+        learning_rate=1.0e-3,
+        schedule="adaptive",
+        gamma=0.99,
+        lam=0.95,
+        desired_kl=0.01,
+        max_grad_norm=1.0,
+    )
+
+
+@configclass
+class RslRlActorCriticRecurrentCNNCfg(RslRlPpoActorCriticCfg):
+    """Policy config for ActorCriticRecurrentCNN.
+
+    class_name uses a colon-qualified path so resolve_callable can import it
+    from the BlindBrigade_tasks package without modifying rsl_rl.
+    """
+
+    @configclass
+    class CNNCfg:
+        """Maps 1-to-1 to rsl_rl.networks.CNN kwargs (except input_dim/input_channels, auto-filled)."""
+
+        output_channels: list = _MISSING
+        kernel_size: list | int = _MISSING
+        stride: list | int = 1
+        padding: str = "none"
+        activation: str = "elu"
+        max_pool: list | bool = False
+        global_pool: str = "none"
+
+    class_name: str = "BlindBrigade_tasks.modules.actor_critic_recurrent_cnn:ActorCriticRecurrentCNN"
+    actor_cnn_cfg: CNNCfg = _MISSING
+    critic_cnn_cfg: CNNCfg = _MISSING
+    rnn_type: str = "lstm"
+    rnn_hidden_dim: int = 256
+    rnn_num_layers: int = 1
+
+
+@configclass
+class PPORunnerBoxCnnCfg(RslRlOnPolicyRunnerCfg):
+    """Runner config for ActorCriticCNN with downward height-map input.
+
+    obs_groups routes:
+      proprioceptive (B, 9)        → MLP branch
+      exteroceptive  (B, 1, 64, 64) → CNN branch
+    """
+
+    num_steps_per_env = 16
+    max_iterations = 2000
+    save_interval = 50
+    experiment_name = "rosbot_box_cnn"
+    obs_groups = {
+        "policy": ["proprioceptive", "exteroceptive"],
+        "critic": ["proprioceptive", "exteroceptive"],
+    }
+    policy = RslRlActorCriticCNNCfg(
+        init_noise_std=1.0,
+        actor_obs_normalization=False,
+        critic_obs_normalization=False,
+        actor_hidden_dims=[256, 128],
+        critic_hidden_dims=[256, 128],
+        actor_cnn_cfg=RslRlActorCriticCNNCfg.CNNCfg(
+            output_channels=[32, 64],
+            kernel_size=[7, 5],  # 64×64 → max_pool → ~28×28; kernel 5 → ~24×24; global_pool avg → 64-dim
+            activation="elu",
+            max_pool=[True, False],
+            global_pool="avg",  # flatten CNN output to 64-dim vector
+        ),
+        critic_cnn_cfg=RslRlActorCriticCNNCfg.CNNCfg(
+            output_channels=[32, 64],
+            kernel_size=[7, 5],
+            activation="elu",
+            max_pool=[True, False],
+            global_pool="avg",
+        ),
+        activation="elu",
+    )
+    algorithm = RslRlPpoAlgorithmCfg(
+        value_loss_coef=1.0,
+        use_clipped_value_loss=True,
+        clip_param=0.2,
+        entropy_coef=0.005,
+        num_learning_epochs=5,
+        num_mini_batches=4,
+        learning_rate=1.0e-3,
+        schedule="adaptive",
+        gamma=0.99,
+        lam=0.95,
+        desired_kl=0.01,
+        max_grad_norm=1.0,
+    )
+
+
+@configclass
+class PPORunnerBoxRecurrentCnnCfg(RslRlOnPolicyRunnerCfg):
+    """Runner config for ActorCriticRecurrentCNN with downward height-map input.
+
+    obs_groups routes:
+      proprioceptive (B, 9)         → MLP branch
+      exteroceptive  (B, 1, 64, 64) → CNN branch → LSTM
+    """
+
+    num_steps_per_env = 16
+    max_iterations = 2000
+    save_interval = 50
+    experiment_name = "rosbot_box_recurrent_cnn"
+    obs_groups = {
+        "policy": ["proprioceptive", "exteroceptive"],
+        "critic": ["proprioceptive", "exteroceptive"],
+    }
+    policy = RslRlActorCriticRecurrentCNNCfg(
+        init_noise_std=1.0,
+        actor_obs_normalization=False,
+        critic_obs_normalization=False,
+        actor_hidden_dims=[256, 128],
+        critic_hidden_dims=[256, 128],
+        actor_cnn_cfg=RslRlActorCriticRecurrentCNNCfg.CNNCfg(
+            output_channels=[32, 64],
+            kernel_size=[7, 5],
+            activation="elu",
+            max_pool=[True, False],
+            global_pool="avg",
+        ),
+        critic_cnn_cfg=RslRlActorCriticRecurrentCNNCfg.CNNCfg(
+            output_channels=[32, 64],
+            kernel_size=[7, 5],
+            activation="elu",
+            max_pool=[True, False],
+            global_pool="avg",
+        ),
+        activation="elu",
+        rnn_type="lstm",
+        rnn_hidden_dim=256,
+        rnn_num_layers=1,
     )
     algorithm = RslRlPpoAlgorithmCfg(
         value_loss_coef=1.0,

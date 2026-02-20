@@ -1,0 +1,200 @@
+from isaaclab.managers import (
+    SceneEntityCfg,
+    EventTermCfg as EventTerm,
+    ObservationGroupCfg as ObsGroup,
+    ObservationTermCfg as ObsTerm,
+    RewardTermCfg as RewTerm,
+    TerminationTermCfg as DoneTerm,
+    CurriculumTermCfg as CurriculumTerm,
+)
+from isaaclab.utils import configclass
+from isaaclab.envs.mdp.terminations import illegal_contact
+from isaaclab_tasks.manager_based.navigation.mdp import (
+    position_command_error_tanh,
+    heading_command_error_abs,
+)
+from isaaclab.envs.mdp.commands import TerrainBasedPose2dCommandCfg
+
+from . import mdp
+
+
+@configclass
+class EventCfg:
+    """Configuration for the events."""
+
+    root_state = EventTerm(
+        func=mdp.reset_root_state_from_terrain,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "pose_range": {"yaw": (-3.14, 3.14)},
+            "velocity_range": {},
+        },
+    )
+
+
+@configclass
+class ObservationsCfg:
+    """Observation specifications for the MDP."""
+
+    @configclass
+    class PolicyCfg(ObsGroup):
+        """Observations for policy group."""
+
+        pose_command   = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
+        base_lin_vel   = ObsTerm(func=mdp.base_lin_vel,       clip=(-1.0, 1.0))
+        base_yaw_rate  = ObsTerm(func=mdp.base_yaw_rate,      clip=(-2.0, 2.0))
+        ray_caster_cam = ObsTerm(func=mdp.ray_caster_lidar,   clip=(0.0, 20.0), params={"asset_cfg": SceneEntityCfg("ray_caster_cam")})
+        last_action    = ObsTerm(func=mdp.last_action,        clip=(-1.0, 1.0))
+
+        def __post_init__(self) -> None:
+            self.enable_corruption = False
+            self.concatenate_terms = True
+
+    @configclass
+    class CriticCfg(ObsGroup):
+        """Observations for critic group."""
+
+        pose_command   = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
+        base_lin_vel   = ObsTerm(func=mdp.base_lin_vel,       clip=(-1.0, 1.0))
+        base_yaw_rate  = ObsTerm(func=mdp.base_yaw_rate,      clip=(-2.0, 2.0))
+        ray_caster_cam = ObsTerm(func=mdp.ray_caster_lidar,   clip=(0.0, 20.0), params={"asset_cfg": SceneEntityCfg("ray_caster_cam")})
+        last_action    = ObsTerm(func=mdp.last_action,        clip=(-1.0, 1.0))
+
+        def __post_init__(self) -> None:
+            self.enable_corruption = False
+            self.concatenate_terms = True
+
+    @configclass
+    class ProprioceptiveCfg(ObsGroup):
+        """Flat state for MLP branch of CNN policy."""
+
+        pose_command  = ObsTerm(func=mdp.generated_commands, params={"command_name": "goal_pose"})
+        base_lin_vel  = ObsTerm(func=mdp.base_lin_vel,  clip=(-1.0, 1.0))
+        base_yaw_rate = ObsTerm(func=mdp.base_yaw_rate, clip=(-2.0, 2.0))
+        last_action   = ObsTerm(func=mdp.last_action,   clip=(-1.0, 1.0))
+
+        def __post_init__(self):
+            self.enable_corruption = False
+            self.concatenate_terms = True  # → (B, 9)
+
+    @configclass
+    class ExteroceptiveCfg(ObsGroup):
+        """Downward height map for CNN branch."""
+
+        depth_map = ObsTerm(
+            func=mdp.ray_caster_image,
+            clip=(0.0, 20.0),
+            params={"asset_cfg": SceneEntityCfg("ray_caster_cam"), "grid_h": 64, "grid_w": 64},
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = False
+            self.concatenate_terms = True  # single 4D term → stays (B, 1, 64, 64)
+
+    # observation groups
+    policy: PolicyCfg = PolicyCfg()
+    critic: CriticCfg = CriticCfg()
+    proprioceptive: ProprioceptiveCfg = ProprioceptiveCfg()
+    exteroceptive: ExteroceptiveCfg = ExteroceptiveCfg()
+
+
+@configclass
+class RewardsCfg:
+    """Reward terms for the MDP."""
+
+    terminating = RewTerm(func=mdp.is_terminated, weight=-100.0)
+    position_tracking = RewTerm(
+        func=position_command_error_tanh,
+        weight=0.5,
+        params={"std": 2.0, "command_name": "goal_pose"},
+    )
+    position_tracking_fine_grained = RewTerm(
+        func=position_command_error_tanh,
+        weight=0.5,
+        params={"std": 0.2, "command_name": "goal_pose"},
+    )
+    position_tracking_precision = RewTerm(
+        func=position_command_error_tanh,
+        weight=0.5,
+        params={"std": 0.05, "command_name": "goal_pose"},
+    )
+    orientation_tracking = RewTerm(
+        func=heading_command_error_abs,
+        weight=-0.2,
+        params={"command_name": "goal_pose"},
+    )
+    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
+
+    # Make Agent Look Where It is Going
+    blind_spot_vel = RewTerm(func=mdp.blind_spot_velocity_penalty, weight=-0.2)
+    heading_vel_align = RewTerm(func=mdp.heading_velocity_alignment, weight=-0.3)
+
+    # Non-contributing reward term. Used to track success
+    track_success = RewTerm(
+        func=mdp.track_goal_reached,
+        params={
+            "promote_threshold": 0.05,
+        },
+        weight=1.0,
+    )
+
+
+@configclass
+class TerminationsCfg:
+    """Termination terms for the MDP."""
+
+    time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    terrain_contact = DoneTerm(
+        func=illegal_contact,
+        params={
+            "threshold": 45,
+            "sensor_cfg": SceneEntityCfg("robot_contact_sensor"),
+        },
+    )
+
+
+@configclass
+class CommandCfg:
+    """Commands for the rosbot."""
+
+    goal_pose = TerrainBasedPose2dCommandCfg(
+        asset_name="robot",
+        ranges=TerrainBasedPose2dCommandCfg.Ranges(
+            heading=(-3.14, 3.14),
+        ),
+        resampling_time_range=(5.0, 5.0),
+        simple_heading=False,
+        debug_vis=True,
+    )
+
+
+@configclass
+class CurriculumCfg:
+    """Curriculum for the rosbot."""
+
+    terrain_level = CurriculumTerm(func=mdp.terrain_levels_nav_success_based)
+
+
+@configclass
+class RosbotActionCfg:
+    """Actions for the rosbot."""
+
+    base_twist: mdp.SE2BaseMecanumDriveCfg = mdp.SE2BaseMecanumDriveCfg(
+        wheel_radius=0.05,
+        half_wheelbase=0.125,
+        half_track=0.105,
+        o_pattern=False,
+        animate_wheels=False,
+    )
+
+
+@configclass
+class RosbotDifferetialActionCfg:
+    """Actions for the rosbot."""
+
+    base_twist: mdp.DifferentialDriveCfg = mdp.DifferentialDriveCfg(
+        wheel_radius=0.05,
+        half_track=0.105,
+        animate_wheels=False,
+    )
