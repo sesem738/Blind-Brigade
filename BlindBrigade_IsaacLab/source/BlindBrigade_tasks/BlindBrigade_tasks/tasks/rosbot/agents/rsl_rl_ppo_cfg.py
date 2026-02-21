@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-from dataclasses import MISSING as _MISSING
+from dataclasses import MISSING
 
 from isaaclab.utils import configclass
 
@@ -23,8 +23,8 @@ class RslRlActorCriticCNNCfg(RslRlPpoActorCriticCfg):
     class CNNCfg:
         """Maps 1-to-1 to rsl_rl.networks.CNN kwargs (except input_dim/input_channels, auto-filled)."""
 
-        output_channels: list = _MISSING
-        kernel_size: list | int = _MISSING
+        output_channels: list = MISSING
+        kernel_size: list | int = MISSING
         stride: list | int = 1
         padding: str = "none"
         activation: str = "elu"
@@ -32,8 +32,8 @@ class RslRlActorCriticCNNCfg(RslRlPpoActorCriticCfg):
         global_pool: str = "none"
 
     class_name: str = "ActorCriticCNN"
-    actor_cnn_cfg: CNNCfg = _MISSING
-    critic_cnn_cfg: CNNCfg = _MISSING
+    actor_cnn_cfg: CNNCfg = MISSING
+    critic_cnn_cfg: CNNCfg = MISSING
 
 
 @configclass
@@ -107,8 +107,8 @@ class RslRlActorCriticRecurrentCNNCfg(RslRlPpoActorCriticCfg):
     class CNNCfg:
         """Maps 1-to-1 to rsl_rl.networks.CNN kwargs (except input_dim/input_channels, auto-filled)."""
 
-        output_channels: list = _MISSING
-        kernel_size: list | int = _MISSING
+        output_channels: list = MISSING
+        kernel_size: list | int = MISSING
         stride: list | int = 1
         padding: str = "none"
         activation: str = "elu"
@@ -116,8 +116,8 @@ class RslRlActorCriticRecurrentCNNCfg(RslRlPpoActorCriticCfg):
         global_pool: str = "none"
 
     class_name: str = "BlindBrigade_tasks.modules.actor_critic_recurrent_cnn:ActorCriticRecurrentCNN"
-    actor_cnn_cfg: CNNCfg = _MISSING
-    critic_cnn_cfg: CNNCfg = _MISSING
+    actor_cnn_cfg: CNNCfg = MISSING
+    critic_cnn_cfg: CNNCfg = MISSING
     rnn_type: str = "lstm"
     rnn_hidden_dim: int = 256
     rnn_num_layers: int = 1
