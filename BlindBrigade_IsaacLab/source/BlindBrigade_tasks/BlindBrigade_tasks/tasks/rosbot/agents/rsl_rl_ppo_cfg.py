@@ -179,6 +179,87 @@ class PPORunnerBoxCnnCfg(RslRlOnPolicyRunnerCfg):
 
 
 @configclass
+class RslRlActorCriticRecurrentRayCastCfg(RslRlPpoActorCriticCfg):
+    """Policy config for ActorCriticRecurrentRayCast.
+
+    raycaster obs groups  →  MLP encoder  →  embedding
+    other 1D obs groups   →  normaliser   →  flat features
+    cat(embedding, flat)  →  GRU          →  MLP  →  actions / value
+    """
+
+    class_name: str = "BlindBrigade_tasks.modules.actor_critic_recurrent_raycast:ActorCriticRecurrentRayCast"
+
+    # Which obs groups (within policy/critic) are routed to the raycaster MLP encoder
+    actor_raycast_groups: list = MISSING
+    critic_raycast_groups: list = MISSING
+
+    # Raycaster MLP encoder architecture
+    raycast_embed_dim: int = 64
+    actor_raycast_encoder_hidden_dims: list = MISSING
+    critic_raycast_encoder_hidden_dims: list = MISSING
+
+    # Optional EmpiricalNormalization on raycaster branch (default off — values
+    # are already normalised to [0, 1] by ray_caster_lidar observation function)
+    actor_raycast_normalization: bool = False
+    critic_raycast_normalization: bool = False
+
+    # GRU / LSTM
+    rnn_type: str = "gru"
+    rnn_hidden_dim: int = 256
+    rnn_num_layers: int = 1
+
+
+@configclass
+class PPORunnerRecurrentRayCastCfg(RslRlOnPolicyRunnerCfg):
+    """Runner config for ActorCriticRecurrentRayCast with 1D raycaster input.
+
+    obs_groups routes:
+      raycaster     (B, N_rays)  →  MLP encoder branch
+      proprioceptive (B, 9)      →  normaliser branch
+    Both are concatenated into the GRU input.
+    """
+
+    num_steps_per_env = 16
+    max_iterations = 2000
+    save_interval = 50
+    experiment_name = "rosbot_recurrent_raycast"
+    obs_groups = {
+        "policy": ["raycaster", "proprioceptive"],
+        "critic": ["raycaster", "proprioceptive"],
+    }
+    policy = RslRlActorCriticRecurrentRayCastCfg(
+        init_noise_std=1.0,
+        actor_obs_normalization=False,
+        critic_obs_normalization=False,
+        actor_hidden_dims=[128, 64],
+        critic_hidden_dims=[128, 64],
+        actor_raycast_groups=["raycaster"],
+        critic_raycast_groups=["raycaster"],
+        raycast_embed_dim=128,
+        actor_raycast_encoder_hidden_dims=[128, 128],
+        critic_raycast_encoder_hidden_dims=[128, 128],
+        rnn_type="gru",
+        rnn_hidden_dim=128,
+        rnn_num_layers=2,
+        activation="elu",
+    )
+    algorithm = RslRlPpoAlgorithmCfg(
+        value_loss_coef=1.0,
+        use_clipped_value_loss=True,
+        clip_param=0.2,
+        entropy_coef=0.005,
+        num_learning_epochs=5,
+        num_mini_batches=4,
+        learning_rate=1.0e-3,
+        schedule="adaptive",
+        gamma=0.99,
+        lam=0.95,
+        desired_kl=0.01,
+        max_grad_norm=1.0,
+    )
+
+
+@configclass
 class PPORunnerBoxRecurrentCnnCfg(RslRlOnPolicyRunnerCfg):
     """Runner config for ActorCriticRecurrentCNN with downward height-map input.
 

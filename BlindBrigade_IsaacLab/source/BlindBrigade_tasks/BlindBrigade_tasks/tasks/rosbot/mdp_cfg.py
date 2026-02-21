@@ -66,6 +66,15 @@ class ObservationsCfg:
             self.concatenate_terms = True
 
     @configclass
+    class RayCasterCfg(ObsGroup):
+        """Flat RayCaster state for MLP branch of CNN policy."""
+        ray_caster_cam = ObsTerm(func=mdp.ray_caster_lidar,   clip=(0.0, 20.0), params={"asset_cfg": SceneEntityCfg("ray_caster_cam")})
+        
+        def __post_init__(self):
+            self.enable_corruption = False
+            self.concatenate_terms = True
+
+    @configclass
     class ProprioceptiveCfg(ObsGroup):
         """Flat state for MLP branch of CNN policy."""
 
@@ -97,6 +106,7 @@ class ObservationsCfg:
     critic: CriticCfg = CriticCfg()
     proprioceptive: ProprioceptiveCfg = ProprioceptiveCfg()
     exteroceptive: ExteroceptiveCfg = ExteroceptiveCfg()
+    raycaster: RayCasterCfg = RayCasterCfg()
 
 
 @configclass
