@@ -81,7 +81,7 @@ def obstacle_approach_penalty(
     env: ManagerBasedRLEnv,
     sensor_cfg: SceneEntityCfg = SceneEntityCfg("ray_caster_cam"),
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-    danger_radius: float = 0.7,
+    danger_radius: float = 0.4,
     safe_dist_normalized: float = 0.85,
 ) -> torch.Tensor:
     """Penalize velocity components directed toward detected obstacles.
