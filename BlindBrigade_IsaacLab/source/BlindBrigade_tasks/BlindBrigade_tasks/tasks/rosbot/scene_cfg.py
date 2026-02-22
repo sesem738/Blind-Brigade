@@ -49,7 +49,7 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
                         num_objects=0, height=0.25, size=(0.05, 0.05), max_yx_angle=0.0, degrees=True
                     ),
                     object_params_end=MeshRepeatedBoxesTerrainCfg.ObjectCfg(
-                        num_objects=5, height=1.0, size=(2.0, 2.0), max_yx_angle=60.0, degrees=True
+                        num_objects=10, height=1.0, size=(2.0, 2.0), max_yx_angle=0*60.0, degrees=True
                     ),
                     flat_patch_sampling={
                         "init_pos": FlatPatchSamplingCfg(
@@ -91,37 +91,37 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         history_length=1,
     )
 
-    zed2_camera: CameraCfg = CameraCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/base_link/zed2_camera",
-        update_period=1.0 / 30.0,  # 30 Hz, matching ZED 2 HD1080 mode
-        data_types=["depth"],
-        spawn=sim_utils.PinholeCameraCfg(
-            focal_length=2.12,           # mm
-            horizontal_aperture=6.05,    # mm  2 × 2.12 × tan(110/2°) ≈ 6.05 mm
-            vertical_aperture=2.97,      # mm  2 × 2.12 × tan(70/2°) ≈ 6.05 mm
-            clipping_range=(0.3, 20.0),  # metres — ZED 2 depth range
-            f_stop=1.06,
-        ),
-        width=662,   # low res (662x376) @15/30/60/100fps binning 4x4 mode per camera
-        height=376,
-        offset=CameraCfg.OffsetCfg(
-            pos=(0.17, 0.0, 0.15),      # 170 mm forward, centred, 150 mm up
-            rot=(0.5, -0.5, 0.5, -0.5),  # rotate so camera faces +X (forward)
-            convention="ros",
-        ),
-    )
+    # zed2_camera: CameraCfg = CameraCfg(
+    #     prim_path="{ENV_REGEX_NS}/Robot/base_link/zed2_camera",
+    #     update_period=1.0 / 30.0,  # 30 Hz, matching ZED 2 HD1080 mode
+    #     data_types=["depth"],
+    #     spawn=sim_utils.PinholeCameraCfg(
+    #         focal_length=2.12,           # mm
+    #         horizontal_aperture=6.05,    # mm  2 × 2.12 × tan(110/2°) ≈ 6.05 mm
+    #         vertical_aperture=2.97,      # mm  2 × 2.12 × tan(70/2°) ≈ 6.05 mm
+    #         clipping_range=(0.3, 20.0),  # metres — ZED 2 depth range
+    #         f_stop=1.06,
+    #     ),
+    #     width=662,   # low res (662x376) @15/30/60/100fps binning 4x4 mode per camera
+    #     height=376,
+    #     offset=CameraCfg.OffsetCfg(
+    #         pos=(0.17, 0.0, 0.15),      # 170 mm forward, centred, 150 mm up
+    #         rot=(0.5, -0.5, 0.5, -0.5),  # rotate so camera faces +X (forward)
+    #         convention="ros",
+    #     ),
+    # )
 
     ray_caster_cam = RayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base_link",
         update_period=0.0,
         offset=RayCasterCfg.OffsetCfg(
-            pos=(0.15, 0.0, 20.0),  # front of robot, slightly above base
+            pos=(0.0, 0.0, 2.0),
         ),
         pattern_cfg=patterns.GridPatternCfg(
-            resolution=0.05,
-            size=(3.15, 3.15),  # arange includes both endpoints: (3.15/0.05)+1 = 64 pts/axis → 64×64
+            resolution=0.2,
+            size=(3.0, 3.0),
         ),
-        max_distance=3.0,
+        max_distance=2.1,
         mesh_prim_paths=["/World/ground"],
         debug_vis=False,
     )

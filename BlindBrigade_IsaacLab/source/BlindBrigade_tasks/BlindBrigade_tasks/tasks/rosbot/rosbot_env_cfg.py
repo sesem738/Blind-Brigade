@@ -57,27 +57,9 @@ class RosbotNavBoxTerrainEnvPLAYCfg(RosbotNavBoxTerrainEnvCfg):
 
     def __post_init__(self):
         super().__post_init__()
-        self.scene.terrain.max_init_terrain_level = 2
-        self.scene.terrain.terrain_generator.num_rows = 3
-        self.scene.terrain.terrain_generator.num_cols = 3
-        self.scene.ray_caster_cam.debug_vis = True
-        self.scene.terrain.debug_vis = True
-        self.actions.base_twist.animate_wheels = True
-
-
-@configclass
-class RosbotNavBoxTerrainDiffEnvCfg(RosbotNavBoxTerrainEnvCfg):
-    def __post_init__(self):
-        super().__post_init__()
-        self.actions: RosbotDifferetialActionCfg = RosbotDifferetialActionCfg()
-
-
-@configclass
-class RosbotNavBoxTerrainDiffEnvPLAYCfg(RosbotNavBoxTerrainDiffEnvCfg):
-    def __post_init__(self):
-        super().__post_init__()
-        self.scene.terrain.max_init_terrain_level = 3
-        self.scene.terrain.terrain_generator.num_rows = 3
+        self.episode_length_s = 100000
+        self.scene.terrain.max_init_terrain_level = 1
+        self.scene.terrain.terrain_generator.num_rows = 1
         self.scene.terrain.terrain_generator.num_cols = 3
         self.scene.ray_caster_cam.debug_vis = True
         self.scene.terrain.debug_vis = True

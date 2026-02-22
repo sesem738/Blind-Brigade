@@ -68,7 +68,7 @@ class ObservationsCfg:
     @configclass
     class RayCasterCfg(ObsGroup):
         """Flat RayCaster state for MLP branch of CNN policy."""
-        ray_caster_cam = ObsTerm(func=mdp.ray_caster_lidar,   clip=(0.0, 20.0), params={"asset_cfg": SceneEntityCfg("ray_caster_cam")})
+        ray_caster_cam = ObsTerm(func=mdp.ray_caster_lidar,   clip=(0.0, 1.0), params={"asset_cfg": SceneEntityCfg("ray_caster_cam")})
         
         def __post_init__(self):
             self.enable_corruption = False
@@ -87,25 +87,25 @@ class ObservationsCfg:
             self.enable_corruption = False
             self.concatenate_terms = True  # → (B, 9)
 
-    @configclass
-    class ExteroceptiveCfg(ObsGroup):
-        """Downward height map for CNN branch."""
+    # @configclass
+    # class ExteroceptiveCfg(ObsGroup):
+    #     """Downward height map for CNN branch."""
 
-        depth_map = ObsTerm(
-            func=mdp.ray_caster_image,
-            clip=(0.0, 20.0),
-            params={"asset_cfg": SceneEntityCfg("ray_caster_cam"), "grid_h": 64, "grid_w": 64},
-        )
+    #     depth_map = ObsTerm(
+    #         func=mdp.ray_caster_image,
+    #         clip=(0.0, 20.0),
+    #         params={"asset_cfg": SceneEntityCfg("ray_caster_cam"), "grid_h": 64, "grid_w": 64},
+    #     )
 
-        def __post_init__(self):
-            self.enable_corruption = False
-            self.concatenate_terms = True  # single 4D term → stays (B, 1, 64, 64)
+    #     def __post_init__(self):
+    #         self.enable_corruption = False
+    #         self.concatenate_terms = True  # single 4D term → stays (B, 1, 64, 64)
 
     # observation groups
     policy: PolicyCfg = PolicyCfg()
     critic: CriticCfg = CriticCfg()
     proprioceptive: ProprioceptiveCfg = ProprioceptiveCfg()
-    exteroceptive: ExteroceptiveCfg = ExteroceptiveCfg()
+    # exteroceptive: ExteroceptiveCfg = ExteroceptiveCfg()
     raycaster: RayCasterCfg = RayCasterCfg()
 
 
@@ -113,7 +113,8 @@ class ObservationsCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
-    terminating = RewTerm(func=mdp.is_terminated, weight=-100.0)
+    terminating = RewTerm(func=mdp.is_terminated, weight=-50.0)
+    position_linear = RewTerm(func=mdp.goal_distance_penalty, weight=-0.1)
     position_tracking = RewTerm(
         func=position_command_error_tanh,
         weight=0.5,
@@ -124,11 +125,11 @@ class RewardsCfg:
         weight=0.5,
         params={"std": 0.2, "command_name": "goal_pose"},
     )
-    position_tracking_precision = RewTerm(
-        func=position_command_error_tanh,
-        weight=0.5,
-        params={"std": 0.05, "command_name": "goal_pose"},
-    )
+    # position_tracking_precision = RewTerm(
+    #     func=position_command_error_tanh,
+    #     weight=0.5,
+    #     params={"std": 0.05, "command_name": "goal_pose"},
+    # )
     orientation_tracking = RewTerm(
         func=heading_command_error_abs,
         weight=-0.2,
@@ -137,7 +138,7 @@ class RewardsCfg:
     action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
 
     # Make Agent Look Where It is Going
-    blind_spot_vel = RewTerm(func=mdp.blind_spot_velocity_penalty, weight=-0.2)
+    # blind_spot_vel = RewTerm(func=mdp.blind_spot_velocity_penalty, weight=-0.2)
     heading_vel_align = RewTerm(func=mdp.heading_velocity_alignment, weight=-0.3)
 
     # Non-contributing reward term. Used to track success

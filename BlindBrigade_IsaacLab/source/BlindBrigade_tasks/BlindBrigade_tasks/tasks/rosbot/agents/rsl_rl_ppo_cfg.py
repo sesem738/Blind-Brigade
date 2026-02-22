@@ -38,7 +38,7 @@ class RslRlActorCriticCNNCfg(RslRlPpoActorCriticCfg):
 
 @configclass
 class PPORunnerBoxCfg(RslRlOnPolicyRunnerCfg):
-    num_steps_per_env = 16
+    num_steps_per_env = 128
     max_iterations = 2000
     save_interval = 50
     experiment_name = "box_reward_trials"
@@ -46,8 +46,8 @@ class PPORunnerBoxCfg(RslRlOnPolicyRunnerCfg):
         init_noise_std=1.0,
         actor_obs_normalization=False,
         critic_obs_normalization=False,
-        actor_hidden_dims=[254, 64],
-        critic_hidden_dims=[128, 64],
+        actor_hidden_dims=[512, 256, 128],
+        critic_hidden_dims=[512, 256, 128],
         activation="elu",
     )
     algorithm = RslRlPpoAlgorithmCfg(
@@ -231,16 +231,16 @@ class PPORunnerRecurrentRayCastCfg(RslRlOnPolicyRunnerCfg):
         init_noise_std=1.0,
         actor_obs_normalization=False,
         critic_obs_normalization=False,
-        actor_hidden_dims=[128, 64],
-        critic_hidden_dims=[128, 64],
+        actor_hidden_dims=[64, 64],
+        critic_hidden_dims=[64, 64],
         actor_raycast_groups=["raycaster"],
         critic_raycast_groups=["raycaster"],
-        raycast_embed_dim=128,
+        raycast_embed_dim=64,
         actor_raycast_encoder_hidden_dims=[128, 128],
         critic_raycast_encoder_hidden_dims=[128, 128],
         rnn_type="gru",
-        rnn_hidden_dim=128,
-        rnn_num_layers=2,
+        rnn_hidden_dim=64,
+        rnn_num_layers=1,
         activation="elu",
     )
     algorithm = RslRlPpoAlgorithmCfg(
