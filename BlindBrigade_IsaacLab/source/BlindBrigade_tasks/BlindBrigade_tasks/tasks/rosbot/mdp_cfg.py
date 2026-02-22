@@ -122,7 +122,7 @@ class ObservationsCfg:
     policy: PolicyCfg = PolicyCfg()
     critic: CriticCfg = CriticCfg()
     proprioceptive: ProprioceptiveCfg = ProprioceptiveCfg()
-    exteroceptive: ExteroceptiveCameraCfg = ExteroceptiveCameraCfg()
+    exteroceptive: ExteroceptiveRayCasterCfg = ExteroceptiveRayCasterCfg()
     heightscan: HeightScanCfg = HeightScanCfg()
 
 
