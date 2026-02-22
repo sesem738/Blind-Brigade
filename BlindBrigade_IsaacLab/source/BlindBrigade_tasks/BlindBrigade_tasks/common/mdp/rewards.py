@@ -11,10 +11,12 @@ if TYPE_CHECKING:
     from isaaclab.assets import Articulation
 
 def track_goal_reached(env: ManagerBasedRLEnv, promote_threshold: float = 0.05) -> torch.Tensor:
-    """Call this every step to check if robot is close to goal.
+    """
+    Increments ``terrain._success_count`` on goal reach; returns zero reward.
 
-    Counts once per goal reached (transition into threshold zone), not per step.
-    Resets _was_near_goal when a new goal is sampled (command resamples).
+    Counts once per goal on transition into ``promote_threshold``, not per step.
+    The count is consumed by the curriculum term to decide promotion/demotion.
+    Also logs ``goal_dist_min/mean`` and ``success_count`` to ``env.extras``.
     """
 
     terrain = env.scene.terrain
@@ -37,15 +39,6 @@ def track_goal_reached(env: ManagerBasedRLEnv, promote_threshold: float = 0.05) 
 
     return torch.zeros(env.num_envs, device=env.device)
 
-def lateral_velocity_penalty_l2(
-    env: ManagerBasedRLEnv, 
-    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-    max_vy: float = 1.0
-    ) -> torch.Tensor:
-    """Penalize lateral (vy) body velocity."""
-
-    asset: Articulation = env.scene[asset_cfg.name]  
-    return torch.square(torch.abs(asset.data.root_lin_vel_b[:, 1]) / max_vy)
 
 def blind_spot_velocity_penalty(
         env: ManagerBasedRLEnv,
@@ -53,7 +46,12 @@ def blind_spot_velocity_penalty(
         max_vx: float = 1.0,
         max_vy: float = 1.0
     ) -> torch.Tensor:
-      """Penalize moving fast in directions the robot can't see."""
+      """
+      Penalizes backward and lateral movement, normalized by max velocities.
+
+      Assumes a forward-facing sensor — backward (vx < 0) and lateral (vy) motion
+      move the robot into unseen space. Returns ``clamp(-vx, 0)/max_vx + |vy|/max_vy``.
+      """
 
       asset: Articulation = env.scene[asset_cfg.name] 
       vel_b = asset.data.root_lin_vel_b[:, :2]  # (vx, vy) in body frame
@@ -70,6 +68,7 @@ def blind_spot_velocity_penalty(
 
       # combine
       return backward_penalty + lateral_penalty
+
 
 def goal_distance_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:                                                                                
     """Penalize distance to goal. Normalized by terrain tile size."""                                                                             

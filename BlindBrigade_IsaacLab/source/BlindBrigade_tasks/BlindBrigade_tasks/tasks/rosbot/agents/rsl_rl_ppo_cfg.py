@@ -9,32 +9,9 @@ from isaaclab.utils import configclass
 
 from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, RslRlPpoAlgorithmCfg
 
-
-@configclass
-class RslRlActorCriticCNNCfg(RslRlPpoActorCriticCfg):
-    """Policy config for ActorCriticCNN — compatible with rsl_rl.modules.ActorCriticCNN.
-
-    When agent_cfg.to_dict() is called, nested @configclass instances are recursively
-    converted to dicts. ActorCriticCNN.__init__ receives actor_cnn_cfg as a plain dict
-    and applies it as CNN kwargs.
-    """
-
-    @configclass
-    class CNNCfg:
-        """Maps 1-to-1 to rsl_rl.networks.CNN kwargs (except input_dim/input_channels, auto-filled)."""
-
-        output_channels: list = MISSING
-        kernel_size: list | int = MISSING
-        stride: list | int = 1
-        padding: str = "none"
-        activation: str = "elu"
-        max_pool: list | bool = False
-        global_pool: str = "none"
-
-    class_name: str = "ActorCriticCNN"
-    actor_cnn_cfg: CNNCfg = MISSING
-    critic_cnn_cfg: CNNCfg = MISSING
-
+########################################################
+#               Regular Actor Critic
+########################################################
 
 @configclass
 class PPORunnerBoxCfg(RslRlOnPolicyRunnerCfg):
@@ -94,13 +71,17 @@ class PPORunnerFlatCfg(RslRlOnPolicyRunnerCfg):
         max_grad_norm=1.0,
     )
 
+########################################################
+#          Image embedding + Actor Critic
+########################################################
 
 @configclass
-class RslRlActorCriticRecurrentCNNCfg(RslRlPpoActorCriticCfg):
-    """Policy config for ActorCriticRecurrentCNN.
+class RslRlActorCriticCNNCfg(RslRlPpoActorCriticCfg):
+    """Policy config for ActorCriticCNN — compatible with rsl_rl.modules.ActorCriticCNN.
 
-    class_name uses a colon-qualified path so resolve_callable can import it
-    from the BlindBrigade_tasks package without modifying rsl_rl.
+    When agent_cfg.to_dict() is called, nested @configclass instances are recursively
+    converted to dicts. ActorCriticCNN.__init__ receives actor_cnn_cfg as a plain dict
+    and applies it as CNN kwargs.
     """
 
     @configclass
@@ -115,13 +96,9 @@ class RslRlActorCriticRecurrentCNNCfg(RslRlPpoActorCriticCfg):
         max_pool: list | bool = False
         global_pool: str = "none"
 
-    class_name: str = "BlindBrigade_tasks.modules.actor_critic_recurrent_cnn:ActorCriticRecurrentCNN"
+    class_name: str = "BlindBrigade_tasks.modules.actor_critic_recurrent_raycast:ActorCriticCNN"
     actor_cnn_cfg: CNNCfg = MISSING
     critic_cnn_cfg: CNNCfg = MISSING
-    rnn_type: str = "lstm"
-    rnn_hidden_dim: int = 256
-    rnn_num_layers: int = 1
-
 
 @configclass
 class PPORunnerBoxCnnCfg(RslRlOnPolicyRunnerCfg):
@@ -132,10 +109,10 @@ class PPORunnerBoxCnnCfg(RslRlOnPolicyRunnerCfg):
       exteroceptive  (B, 1, 64, 64) → CNN branch
     """
 
-    num_steps_per_env = 16
+    num_steps_per_env = 64
     max_iterations = 2000
     save_interval = 50
-    experiment_name = "rosbot_box_cnn"
+    experiment_name = "rosbot_cnn_mlp"
     obs_groups = {
         "policy": ["proprioceptive", "exteroceptive"],
         "critic": ["proprioceptive", "exteroceptive"],
@@ -177,6 +154,9 @@ class PPORunnerBoxCnnCfg(RslRlOnPolicyRunnerCfg):
         max_grad_norm=1.0,
     )
 
+########################################################
+#      Height scan embed + Recurrent Actor Critic
+########################################################
 
 @configclass
 class RslRlActorCriticRecurrentRayCastCfg(RslRlPpoActorCriticCfg):
@@ -210,7 +190,7 @@ class RslRlActorCriticRecurrentRayCastCfg(RslRlPpoActorCriticCfg):
 
 
 @configclass
-class PPORunnerRecurrentRayCastCfg(RslRlOnPolicyRunnerCfg):
+class PPORunnerBoxRecurrentRayCastCfg(RslRlOnPolicyRunnerCfg):
     """Runner config for ActorCriticRecurrentRayCast with 1D raycaster input.
 
     obs_groups routes:
@@ -219,13 +199,13 @@ class PPORunnerRecurrentRayCastCfg(RslRlOnPolicyRunnerCfg):
     Both are concatenated into the GRU input.
     """
 
-    num_steps_per_env = 16
+    num_steps_per_env = 64
     max_iterations = 2000
     save_interval = 50
-    experiment_name = "rosbot_recurrent_raycast"
+    experiment_name = "rosbot_heightscan_gru_mlp"
     obs_groups = {
-        "policy": ["raycaster", "proprioceptive"],
-        "critic": ["raycaster", "proprioceptive"],
+        "policy": ["heightscan", "proprioceptive"],
+        "critic": ["heightscan", "proprioceptive"],
     }
     policy = RslRlActorCriticRecurrentRayCastCfg(
         init_noise_std=1.0,
@@ -233,8 +213,8 @@ class PPORunnerRecurrentRayCastCfg(RslRlOnPolicyRunnerCfg):
         critic_obs_normalization=False,
         actor_hidden_dims=[64, 64],
         critic_hidden_dims=[64, 64],
-        actor_raycast_groups=["raycaster"],
-        critic_raycast_groups=["raycaster"],
+        actor_raycast_groups=["heightscan"],
+        critic_raycast_groups=["heightscan"],
         raycast_embed_dim=64,
         actor_raycast_encoder_hidden_dims=[128, 128],
         critic_raycast_encoder_hidden_dims=[128, 128],
@@ -258,6 +238,37 @@ class PPORunnerRecurrentRayCastCfg(RslRlOnPolicyRunnerCfg):
         max_grad_norm=1.0,
     )
 
+########################################################
+#      Image embedding + Recurrent Actor Critic
+########################################################
+
+@configclass
+class RslRlActorCriticRecurrentCNNCfg(RslRlPpoActorCriticCfg):
+    """Policy config for ActorCriticRecurrentCNN.
+
+    class_name uses a colon-qualified path so resolve_callable can import it
+    from the BlindBrigade_tasks package without modifying rsl_rl.
+    """
+
+    @configclass
+    class CNNCfg:
+        """Maps 1-to-1 to rsl_rl.networks.CNN kwargs (except input_dim/input_channels, auto-filled)."""
+
+        output_channels: list = MISSING
+        kernel_size: list | int = MISSING
+        stride: list | int = 1
+        padding: str = "none"
+        activation: str = "elu"
+        max_pool: list | bool = False
+        global_pool: str = "none"
+
+    class_name: str = "BlindBrigade_tasks.modules.actor_critic_recurrent_cnn:ActorCriticRecurrentCNN"
+    actor_cnn_cfg: CNNCfg = MISSING
+    critic_cnn_cfg: CNNCfg = MISSING
+    rnn_type: str = "lstm"
+    rnn_hidden_dim: int = 256
+    rnn_num_layers: int = 1
+
 
 @configclass
 class PPORunnerBoxRecurrentCnnCfg(RslRlOnPolicyRunnerCfg):
@@ -268,10 +279,10 @@ class PPORunnerBoxRecurrentCnnCfg(RslRlOnPolicyRunnerCfg):
       exteroceptive  (B, 1, 64, 64) → CNN branch → LSTM
     """
 
-    num_steps_per_env = 16
+    num_steps_per_env = 64
     max_iterations = 2000
     save_interval = 50
-    experiment_name = "rosbot_box_recurrent_cnn"
+    experiment_name = "rosbot_recurrent_cnn"
     obs_groups = {
         "policy": ["proprioceptive", "exteroceptive"],
         "critic": ["proprioceptive", "exteroceptive"],

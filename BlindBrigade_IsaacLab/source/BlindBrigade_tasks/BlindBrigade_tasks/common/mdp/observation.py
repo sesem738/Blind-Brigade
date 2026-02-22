@@ -2,93 +2,55 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import torch
-import torch.nn.functional as F
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import Camera, RayCasterCamera, TiledCamera
+from isaaclab.envs.mdp import height_scan
 
 if TYPE_CHECKING:   
     from isaaclab.envs import ManagerBasedRLEnv
     from isaaclab.assets import Articulation
+    from isaaclab.sensors import RayCaster
 
 
-def base_yaw_rate(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor: 
+def base_yaw_rate(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """
-    Returns yaw rate in body frame
-    
-    :param env: Description
-    :type env: ManagerBasedRLEnv
-    :return: Description
-    :rtype: Tensor
-    """                                             
+    Body-frame yaw rate of the robot root. Returns shape (B, 1).
+    """
     asset: Articulation = env.scene[asset_cfg.name]              
     return asset.data.root_ang_vel_b[:, 2:3] 
 
 
-def ray_caster_depth(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("ray_caster_cam")) -> torch.Tensor:
-    """Alternative:
-    ObsTerm(
-        func=mdp.image, clip=(0.0,1.0), 
-        params={
-            "sensor_cfg": SceneEntityCfg("ray_caster_cam"),
-            "data_type":"distance_to_image_plane",
-            "normalize":False
-        }
-    )
-    * Needs to be flattened if using MLP instead of CNN
+def height_scan_normalized(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
     """
-    asset: Articulation = env.scene[asset_cfg.name] 
-    depth = asset.data.output["distance_to_image_plane"]
-    depth = torch.nan_to_num(depth, nan=asset.cfg.max_distance) / asset.cfg.max_distance
-    return depth.reshape(env.num_envs, -1)
-
-
-def ray_caster_lidar(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
-    sensor = env.scene[asset_cfg.name]
-    distances = torch.norm(sensor.data.ray_hits_w - sensor.data.pos_w.unsqueeze(1), dim=-1)
-    distances = torch.nan_to_num(distances, nan=sensor.cfg.max_distance) / sensor.cfg.max_distance
-    return distances.reshape(env.num_envs, -1)
+    Height scan from a RayCaster, normalized to [0, 1] by ``max_distance`` and flattened to (B, N).
+    """
+    distances = height_scan(env=env, sensor_cfg=sensor_cfg, offset=0.0)
+    distances = torch.nan_to_num(
+        input=distances, 
+        nan=env.scene.sensors[sensor_cfg.name].cfg.max_distance
+    ) / (env.scene.sensors[sensor_cfg.name].cfg.max_distance + 0.01)
+    return distances
 
 
 def ray_caster_image(
     env: ManagerBasedRLEnv,
-    asset_cfg: SceneEntityCfg = SceneEntityCfg("ray_caster_cam"),
+    sensor_cfg: SceneEntityCfg = SceneEntityCfg("ray_caster_cam"),
     grid_h: int = 64,
     grid_w: int = 64,
 ) -> torch.Tensor:
-    """Returns a (B, 1, H, W) depth image from a GridPattern RayCaster.
+    """Depth image from a GridPattern RayCaster, normalized to [0, 1]. Returns shape (B, 1, H, W).
 
-    Requires GridPatternCfg with ordering='xy' (default) and
-    size/resolution configured so total rays == grid_h * grid_w.
+    A RayCaster outputs flat ray hits with no 2D structure, so ``grid_h`` and ``grid_w``
+    must be provided explicitly and satisfy ``grid_h * grid_w == total rays``.
+    Requires ``GridPatternCfg`` with ``ordering='xy'`` (default).
     """
-    sensor = env.scene[asset_cfg.name]
-    distances = torch.norm(
-        sensor.data.ray_hits_w - sensor.data.pos_w.unsqueeze(1), dim=-1
-    )
+
+    # extract the used quantities (to enable type-hinting)
+    sensor: RayCaster = env.scene.sensors[sensor_cfg.name]
+    distances = torch.norm(sensor.data.ray_hits_w - sensor.data.pos_w.unsqueeze(1), dim=-1)
     distances = torch.nan_to_num(distances, nan=sensor.cfg.max_distance)
-    distances = distances / sensor.cfg.max_distance  # normalize [0, 1]
+    distances = distances / (sensor.cfg.max_distance + 0.01)  # normalize [0, 1]
     return distances.reshape(env.num_envs, 1, grid_h, grid_w)
-
-
-def camera_billinear_interpolation(
-    env: ManagerBasedRLEnv,
-    asset_cfg: SceneEntityCfg = SceneEntityCfg("guide_zed2_camera"),
-    max_depth: float = 20.0,
-    output_shape: tuple = (64, 36),
-) -> torch.Tensor:
-    """Normalized, downsampled depth image from the ZED2 pinhole camera for MLP policies.
-
-    Depth is clamped to [0, max_depth], normalized to [0, 1], bilinearly downsampled
-    to output_shape (W, H), then flattened. Output size: output_shape[0] * output_shape[1].
-    """
-    sensor = env.scene[asset_cfg.name]
-    # shape: (num_envs, H, W, 1)
-    depth = sensor.data.output["distance_to_image_plane"].float()
-    depth = torch.nan_to_num(depth, nan=max_depth, posinf=max_depth)
-    depth = depth.clamp(0.0, max_depth) / max_depth
-    # F.interpolate expects (N, C, H, W)
-    depth = depth.permute(0, 3, 1, 2)
-    depth = F.interpolate(depth, size=output_shape, mode="bilinear", align_corners=False)
-    return depth.reshape(env.num_envs, -1)
 
 
 def camera_image(
@@ -98,20 +60,13 @@ def camera_image(
     flatten: bool = False,
     nan_fill_value: float | None = None,
 ) -> torch.Tensor:
-    """Camera image Observations.
+    """Image observation from a Camera, RayCasterCamera, or TiledCamera sensor.
 
-    The camera image observation from the given sensor w.r.t. the asset's root frame.
-    Also removes nan/inf values and sets them to the maximum distance of the sensor
-
-    Args:
-        env: The environment object.
-        sensor_cfg: The name of the sensor.
-        data_type: The type of data to extract from the sensor. Default is "distance_to_image_plane".
-        flatten: If True, the image will be flattened to 1D. Default is False.
-        nan_fill_value: The value to fill nan/inf values with. If None, the maximum distance of the sensor will be used.
-
-    Returns:
-        The image data."""
+    Retrieves ``data_type`` from the sensor output. For depth images, NaN/inf values
+    are replaced with the sensor's clipping range max (or ``nan_fill_value`` if provided),
+    and uint8 images are scaled to [0, 1]. Returns shape (B, C, H, W), or (B, N) if
+    ``flatten=True``.
+    """
     # extract the used quantities (to enable type-hinting)
     sensor: Camera | RayCasterCamera | TiledCamera = env.scene.sensors[sensor_cfg.name]
 

@@ -11,7 +11,6 @@ from .mdp_cfg import (
     CommandCfg,
     CurriculumCfg,
     RosbotActionCfg,
-    RosbotDifferetialActionCfg,
 )
 
 

@@ -49,14 +49,16 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
                         num_objects=0, height=0.25, size=(0.05, 0.05), max_yx_angle=0.0, degrees=True
                     ),
                     object_params_end=MeshRepeatedBoxesTerrainCfg.ObjectCfg(
-                        num_objects=10, height=1.0, size=(2.0, 2.0), max_yx_angle=0*60.0, degrees=True
+                        num_objects=20, height=1.0, size=(2.0, 2.0), max_yx_angle=0*60.0, degrees=True
                     ),
                     flat_patch_sampling={
                         "init_pos": FlatPatchSamplingCfg(
-                            num_patches=50, patch_radius=[0.05, 0.1, 0.2, 0.3, 0.4, 0.5], max_height_diff=0.01
+                            num_patches=50, patch_radius=[0.05, 0.1, 0.2, 0.3, 0.4, 0.5], max_height_diff=0.01,
+                            z_range=(-0.05, 0.05),
                         ),
                         "target": FlatPatchSamplingCfg(
-                            num_patches=50, patch_radius=[0.05, 0.1, 0.2, 0.3, 0.4, 0.5], max_height_diff=0.01
+                            num_patches=50, patch_radius=[0.05, 0.1, 0.2, 0.3, 0.4, 0.5], max_height_diff=0.01,
+                            z_range=(-0.05, 0.05),
                         ),
                     },
                 ),
