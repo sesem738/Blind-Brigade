@@ -149,6 +149,20 @@ class RewardsCfg:
     )
     action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
 
+    # Penalize velocity directed toward detected obstacles.
+    # Moving parallel to obstacles (squeezing through a gap) is not penalized —
+    # only actively closing the gap is. Scale with danger_radius and safe_dist_normalized
+    # to tune how early and how aggressively the avoidance kicks in.
+    obstacle_approach = RewTerm(
+        func=mdp.obstacle_approach_penalty,
+        weight=-1.0,
+        params={
+            "sensor_cfg": SceneEntityCfg("ray_caster_cam"),
+            "danger_radius": 0.7,
+            "safe_dist_normalized": 0.85,
+        },
+    )
+
     # Make Agent Look Where it is Going
     heading_vel_align = RewTerm(func=mdp.heading_velocity_alignment, weight=-0.3)
 

@@ -123,7 +123,7 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
             resolution=0.2,
             size=(3.0, 3.0),
         ),
-        max_distance=2.1,
+        max_distance=3,
         mesh_prim_paths=["/World/ground"],
         debug_vis=False,
     )
