@@ -42,6 +42,10 @@ import gymnasium as gym
 import time
 import torch
 
+import random
+
+import isaaclab.sim as sim_utils
+from isaaclab.markers import VisualizationMarkers, VisualizationMarkersCfg
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils import parse_env_cfg
 from isaaclab.devices.keyboard import Se2Keyboard, Se2KeyboardCfg
@@ -78,6 +82,27 @@ def main():
     print(keyboard)
     print(f"\n[INFO]: Action dim = {action_dim}. Keyboard controls first 3 dims (guide robot).")
     print("[INFO]: Remaining action dims (blind robot) are zeroed out.\n")
+
+    # visualize flat patches if available
+    flat_patches = env.unwrapped.scene.terrain.flat_patches
+    if flat_patches:
+        vis_cfg = VisualizationMarkersCfg(prim_path="/Visuals/TerrainFlatPatches", markers={})
+        for name in flat_patches:
+            vis_cfg.markers[name] = sim_utils.CylinderCfg(
+                radius=0.2,
+                height=0.1,
+                visual_material=sim_utils.GlassMdlCfg(
+                    glass_color=(random.random(), random.random(), random.random())
+                ),
+            )
+        flat_patches_visualizer = VisualizationMarkers(vis_cfg)
+        all_locations = []
+        all_indices = []
+        for i, locations in enumerate(flat_patches.values()):
+            flat = locations.view(-1, 3)
+            all_locations.append(flat)
+            all_indices += [i] * flat.shape[0]
+        flat_patches_visualizer.visualize(torch.cat(all_locations), marker_indices=all_indices)
 
     # reset
     env.reset()
