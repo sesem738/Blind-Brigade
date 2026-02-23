@@ -11,7 +11,6 @@ from isaaclab.utils import configclass
 from isaaclab.envs.mdp.terminations import illegal_contact
 from isaaclab_tasks.manager_based.navigation.mdp import (
     position_command_error_tanh,
-    heading_command_error_abs,
 )
 from isaaclab.envs.mdp.commands import TerrainBasedPose2dCommandCfg
 from BlindBrigade_tasks.common import mdp
@@ -131,28 +130,34 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     terminating = RewTerm(func=mdp.is_terminated, weight=-50.0)
-    position_linear = RewTerm(func=mdp.goal_distance_penalty, weight=-0.1)
+
+    # Linear distance penalty — provides a consistent gradient at all distances.
+    position_linear = RewTerm(func=mdp.goal_distance_penalty, weight=-0.3)
+
+    # Coarse position tracking (tanh kernel, wide std for medium-range signal)
     position_tracking = RewTerm(
         func=position_command_error_tanh,
         weight=0.5,
         params={"std": 2.0, "command_name": "goal_pose"},
     )
+
+    # Fine-grained position tracking near the goal
     position_tracking_fine_grained = RewTerm(
         func=position_command_error_tanh,
         weight=0.5,
-        params={"std": 0.2, "command_name": "goal_pose"},
+        params={"std": 0.5, "command_name": "goal_pose"},
     )
-    orientation_tracking = RewTerm(
-        func=heading_command_error_abs,
-        weight=-0.2,
-        params={"command_name": "goal_pose"},
+
+    # Strong bonus that ramps up within 0.5 m of the goal
+    goal_reached = RewTerm(
+        func=mdp.goal_reached_bonus,
+        weight=5.0,
+        params={"threshold": 0.5},
     )
+
     action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
 
     # Penalize velocity directed toward detected obstacles.
-    # Moving parallel to obstacles (squeezing through a gap) is not penalized —
-    # only actively closing the gap is. Scale with danger_radius and safe_dist_normalized
-    # to tune how early and how aggressively the avoidance kicks in.
     obstacle_approach = RewTerm(
         func=mdp.obstacle_approach_penalty,
         weight=-1.0,
@@ -163,10 +168,7 @@ class RewardsCfg:
         },
     )
 
-    # Make Agent Look Where it is Going
-    heading_vel_align = RewTerm(func=mdp.heading_velocity_alignment, weight=-0.3)
-
-    # Non-contributing reward term. Used to track success
+    # Non-contributing reward term. Used to track success for curriculum.
     track_success = RewTerm(
         func=mdp.track_goal_reached,
         params={

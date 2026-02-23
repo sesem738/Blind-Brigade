@@ -77,6 +77,17 @@ def goal_distance_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
     return torch.norm(command[:, :2], dim=1)
 
 
+def goal_reached_bonus(env: ManagerBasedRLEnv, threshold: float = 0.5) -> torch.Tensor:
+    """Smooth bonus that ramps linearly from 0 at *threshold* to 1.0 at the goal.
+
+    Provides a strong, localised incentive for the final approach without
+    discontinuous jumps that destabilise value-function learning.
+    """
+    command = env.command_manager.get_command("goal_pose")
+    distance = torch.norm(command[:, :2], dim=1)
+    return torch.clamp(1.0 - distance / threshold, min=0.0)
+
+
 def obstacle_approach_penalty(
     env: ManagerBasedRLEnv,
     sensor_cfg: SceneEntityCfg = SceneEntityCfg("ray_caster_cam"),
