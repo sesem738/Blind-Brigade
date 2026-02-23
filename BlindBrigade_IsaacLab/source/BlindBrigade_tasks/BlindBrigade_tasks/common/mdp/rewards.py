@@ -104,6 +104,9 @@ def obstacle_approach_penalty(
     ray_hits   = sensor.data.ray_hits_w           # (B, N, 3)
     sensor_pos = sensor.data.pos_w                # (B, 3)
 
+    # Rays that fall into pits or miss return inf/nan — mark them invalid
+    valid = torch.isfinite(ray_hits).all(dim=-1)  # (B, N)
+
     # world-frame xy velocity
     vel_w = asset.data.root_lin_vel_w[:, :2]      # (B, 2)
 
@@ -114,20 +117,22 @@ def obstacle_approach_penalty(
 
     # normalized ray length — small value indicates a tall obstacle
     raw_dist  = torch.norm(ray_hits - sensor_pos.unsqueeze(1), dim=-1)  # (B, N)
-    raw_dist  = torch.nan_to_num(raw_dist, nan=sensor.cfg.max_distance)
+    raw_dist  = torch.nan_to_num(raw_dist, nan=sensor.cfg.max_distance, posinf=sensor.cfg.max_distance, neginf=-sensor.cfg.max_distance)
     norm_dist = raw_dist / (sensor.cfg.max_distance + 0.01)
 
     # obstacle severity: 0 when clear, approaching 1 for max obstacle height
     obstacle_weight = torch.clamp(safe_dist_normalized - norm_dist, min=0.0) / safe_dist_normalized
 
     # unit vector pointing from robot toward each ray hit
+    # inf/inf produces NaN — replace with zero (these rays are masked out below)
     hit_dir    = horiz_vec / horiz_dist.clamp(min=1e-6).unsqueeze(-1)   # (B, N, 2)
+    hit_dir    = torch.nan_to_num(hit_dir, nan=0.0)
 
     # scalar velocity component in the direction of each obstacle (positive = approaching)
     vel_toward = (vel_w.unsqueeze(1) * hit_dir).sum(dim=-1)             # (B, N)
     approach   = torch.clamp(vel_toward, min=0.0)
 
-    in_zone = (horiz_dist < danger_radius)
+    in_zone = (horiz_dist < danger_radius) & valid
     return (approach * obstacle_weight * in_zone.float()).sum(dim=1)
 
 

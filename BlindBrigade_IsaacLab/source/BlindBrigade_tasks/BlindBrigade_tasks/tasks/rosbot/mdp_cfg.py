@@ -43,7 +43,7 @@ class ObservationsCfg:
         pose_command  = ObsTerm(func=mdp.generated_commands,     params={"command_name": "goal_pose"})
         base_lin_vel  = ObsTerm(func=mdp.base_lin_vel,           clip=(-1.0, 1.0))
         base_yaw_rate = ObsTerm(func=mdp.base_yaw_rate,          clip=(-2.0, 2.0))
-        height_scan   = ObsTerm(func=mdp.height_scan_normalized, clip=(0.0, 20.0), params={"sensor_cfg": SceneEntityCfg("ray_caster_cam")})
+        height_scan   = ObsTerm(func=mdp.height_scan_normalized, clip=(0.0, 2.0), params={"sensor_cfg": SceneEntityCfg("ray_caster_cam")})
         last_action   = ObsTerm(func=mdp.last_action,            clip=(-1.0, 1.0))
 
         def __post_init__(self) -> None:
@@ -57,7 +57,7 @@ class ObservationsCfg:
         pose_command  = ObsTerm(func=mdp.generated_commands,     params={"command_name": "goal_pose"})
         base_lin_vel  = ObsTerm(func=mdp.base_lin_vel,           clip=(-1.0, 1.0))
         base_yaw_rate = ObsTerm(func=mdp.base_yaw_rate,          clip=(-2.0, 2.0))
-        height_scan   = ObsTerm(func=mdp.height_scan_normalized, clip=(0.0, 20.0), params={"sensor_cfg": SceneEntityCfg("ray_caster_cam")})
+        height_scan   = ObsTerm(func=mdp.height_scan_normalized, clip=(0.0, 2.0), params={"sensor_cfg": SceneEntityCfg("ray_caster_cam")})
         last_action   = ObsTerm(func=mdp.last_action,            clip=(-1.0, 1.0))
 
         def __post_init__(self) -> None:
@@ -69,7 +69,7 @@ class ObservationsCfg:
         """Flat RayCaster state for MLP branch of CNN policy."""
         height_scan = ObsTerm(
             func=mdp.height_scan_normalized,
-            clip=(0.0, 1.0), 
+            clip=(0.0, 2.0), 
             params={"sensor_cfg": SceneEntityCfg("ray_caster_cam")}
         )
         
@@ -96,7 +96,7 @@ class ObservationsCfg:
 
         depth_map = ObsTerm(
             func=mdp.ray_caster_image,
-            clip=(0.0, 1.0),
+            clip=(0.0, 2.0),
             params={"sensor_cfg": SceneEntityCfg("ray_caster_cam"), "grid_h": 16, "grid_w": 16},
         )
 

@@ -6,8 +6,6 @@ from isaaclab.terrains import (
     TerrainImporterCfg,
     TerrainGeneratorCfg,
     MeshRepeatedBoxesTerrainCfg,
-    MeshRepeatedCylindersTerrainCfg,
-    MeshBoxTerrainCfg,
     HfDiscreteObstaclesTerrainCfg,
     FlatPatchSamplingCfg,
 )
@@ -53,7 +51,7 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
                         num_objects=1, height=0.25, size=(0.05, 0.05), max_yx_angle=0.0, degrees=True
                     ),
                     object_params_end=MeshRepeatedBoxesTerrainCfg.ObjectCfg(
-                        num_objects=4, height=1.0, size=(2.0, 2.0), max_yx_angle=0*60.0, degrees=True
+                        num_objects=6, height=1.0, size=(2.0, 2.0), max_yx_angle=0.0, degrees=True
                     ),
                     flat_patch_sampling={
                         "init_pos": FlatPatchSamplingCfg(
@@ -67,7 +65,6 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
                     },
                 ),
                 "obstacles": HfDiscreteObstaclesTerrainCfg(
-                    size=(8.0, 8.0),
                     horizontal_scale=0.1,
                     vertical_scale=0.1,
                     border_width=0.0,
@@ -75,7 +72,7 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
                     obstacle_height_mode="fixed",
                     obstacle_width_range=(0.4, 0.8),
                     obstacle_height_range=(0.1, 1.0),
-                    platform_width=1.5,
+                    platform_width=2.1,
                     flat_patch_sampling={
                         "init_pos": FlatPatchSamplingCfg(
                             num_patches=50, patch_radius=[0.05, 0.1, 0.2, 0.3, 0.4, 0.5], max_height_diff=0.01,
@@ -86,8 +83,7 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
                             z_range=(-0.05, 0.05),
                         ),
                     },
-                    ),
-
+                ),
             },
         ),
         collision_group=-1,

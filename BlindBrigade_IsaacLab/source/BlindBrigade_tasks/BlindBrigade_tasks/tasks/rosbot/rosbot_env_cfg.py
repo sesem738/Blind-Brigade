@@ -56,13 +56,16 @@ class RosbotNavBoxTerrainEnvPLAYCfg(RosbotNavBoxTerrainEnvCfg):
 
     def __post_init__(self):
         super().__post_init__()
-        self.episode_length_s = 100000
+        # self.episode_length_s = 100000
+        self.scene.terrain.terrain_generator.difficulty_range = (0.5, 1.0)
+        self.scene.terrain.terrain_generator.curriculum = False
         self.scene.terrain.max_init_terrain_level = 1
         self.scene.terrain.terrain_generator.num_rows = 1
-        self.scene.terrain.terrain_generator.num_cols = 3
+        self.scene.terrain.terrain_generator.num_cols = 6
         self.scene.ray_caster_cam.debug_vis = True
         self.scene.terrain.debug_vis = True
         self.actions.base_twist.animate_wheels = True
+        self.curriculum = None
 
 
 @configclass
