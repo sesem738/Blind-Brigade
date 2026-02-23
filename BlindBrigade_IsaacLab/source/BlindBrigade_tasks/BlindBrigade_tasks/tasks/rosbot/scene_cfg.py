@@ -6,9 +6,13 @@ from isaaclab.terrains import (
     TerrainImporterCfg,
     TerrainGeneratorCfg,
     MeshRepeatedBoxesTerrainCfg,
+    MeshRepeatedCylindersTerrainCfg,
+    MeshBoxTerrainCfg,
+    HfDiscreteObstaclesTerrainCfg,
     FlatPatchSamplingCfg,
 )
 from isaaclab.utils import configclass
+from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 
 from BlindBrigade_assets.robot.rosbot_xl_mecanum import ROSBOT_XL_CFG
 
@@ -38,7 +42,7 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
             horizontal_scale=0.1,
             vertical_scale=0.005,
             slope_threshold=0.75,
-            difficulty_range=(0.0, 1.0),
+            difficulty_range=(0.5, 1.0),
             curriculum=True,
             use_cache=False,
             sub_terrains={
@@ -46,10 +50,10 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
                     platform_width=0,
                     platform_height=0,
                     object_params_start=MeshRepeatedBoxesTerrainCfg.ObjectCfg(
-                        num_objects=0, height=0.25, size=(0.05, 0.05), max_yx_angle=0.0, degrees=True
+                        num_objects=1, height=0.25, size=(0.05, 0.05), max_yx_angle=0.0, degrees=True
                     ),
                     object_params_end=MeshRepeatedBoxesTerrainCfg.ObjectCfg(
-                        num_objects=20, height=1.0, size=(2.0, 2.0), max_yx_angle=0*60.0, degrees=True
+                        num_objects=4, height=1.0, size=(2.0, 2.0), max_yx_angle=0*60.0, degrees=True
                     ),
                     flat_patch_sampling={
                         "init_pos": FlatPatchSamplingCfg(
@@ -62,6 +66,28 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
                         ),
                     },
                 ),
+                "obstacles": HfDiscreteObstaclesTerrainCfg(
+                    size=(8.0, 8.0),
+                    horizontal_scale=0.1,
+                    vertical_scale=0.1,
+                    border_width=0.0,
+                    num_obstacles=40,
+                    obstacle_height_mode="fixed",
+                    obstacle_width_range=(0.4, 0.8),
+                    obstacle_height_range=(0.1, 1.0),
+                    platform_width=1.5,
+                    flat_patch_sampling={
+                        "init_pos": FlatPatchSamplingCfg(
+                            num_patches=50, patch_radius=[0.05, 0.1, 0.2, 0.3, 0.4, 0.5], max_height_diff=0.01,
+                            z_range=(-0.05, 0.05),
+                        ),
+                        "target": FlatPatchSamplingCfg(
+                            num_patches=50, patch_radius=[0.05, 0.1, 0.2, 0.3, 0.4, 0.5], max_height_diff=0.01,
+                            z_range=(-0.05, 0.05),
+                        ),
+                    },
+                    ),
+
             },
         ),
         collision_group=-1,
@@ -71,8 +97,13 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
             static_friction=1.0,
             dynamic_friction=1.0,
         ),
-        visual_material=sim_utils.PreviewSurfaceCfg(
-            diffuse_color=(0.0, 0.0, 0.0),
+        # visual_material=sim_utils.PreviewSurfaceCfg(
+        #     diffuse_color=(0.0, 0.0, 0.0),
+        # ),
+        visual_material=sim_utils.MdlFileCfg(
+            mdl_path=f"{ISAACLAB_NUCLEUS_DIR}/Materials/TilesMarbleSpiderWhiteBrickBondHoned/TilesMarbleSpiderWhiteBrickBondHoned.mdl",
+            project_uvw=True,
+            texture_scale=(0.25, 0.25),
         ),
         debug_vis=False,
     )
