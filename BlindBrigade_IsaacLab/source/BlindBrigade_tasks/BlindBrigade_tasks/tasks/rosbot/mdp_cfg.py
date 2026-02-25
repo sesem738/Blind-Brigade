@@ -201,6 +201,7 @@ class CommandCfg:
         ranges=mdp.TerrainBasedPosition2dCommandCfg.Ranges(
             heading=(-3.14, 3.14),
         ),
+        resampling_time_range=(20.0,20.0),
         goal_reached_threshold=0.1,
         debug_vis=True,
     )
@@ -212,6 +213,30 @@ class CurriculumCfg:
 
     terrain_level = CurriculumTerm(func=mdp.terrain_levels_nav_success_based)
 
+    # Term scales min resampling time considering curriculum progress up to scheduled iterations
+    # e.g., resampling time (20.0,20.0) -> (5.0, 20.0) in 0 to 250 epochs
+    goal_resample_time = CurriculumTerm(
+        func=mdp.goal_ramp_resample_time_by_iteration,
+        params={
+            "command_name": "goal_pose",
+            "schedule_iterations": 250,
+            "min_resample_time_s": 5.0,
+            "max_resample_time_s": 20.0,
+            "num_steps_per_env": 64,    # Must match rsl config
+        },
+    )
+
+    # Term sets (min, max)_at specified training iteration 
+    # goal_resample_time = CurriculumTerm(
+    #     func=mdp.goal_step_resample_time_at_iteration,
+    #     params={
+    #         "command_name": "goal_pose",
+    #         "schedule_iterations": 150,
+    #         "num_steps_per_env": 64,    # Must match rsl config
+    #         "max_resample_time_s": 20.0,
+    #         "min_resample_time_s": 5.0,
+    #     },
+    # )
 
 @configclass
 class RosbotActionCfg:

@@ -442,8 +442,6 @@ class TerrainBasedPosition2dCommandCfg(TerrainBasedPose2dCommandCfg):
 
     class_type: type = TerrainBasedPosition2dCommand
 
-    resampling_time_range: tuple[float, float] = (250.0, 250.0)
-    """Resampling is disabled by default — goals only resample on goal reach."""
 
     goal_reached_threshold: float = 0.05
     """Distance (m) at which the goal is considered reached and resampled next step."""
