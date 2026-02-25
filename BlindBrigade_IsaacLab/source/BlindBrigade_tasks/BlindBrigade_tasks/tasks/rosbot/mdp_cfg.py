@@ -179,6 +179,46 @@ class RewardsCfg:
 
 
 @configclass
+class SRURewardsCfg:
+    """Reward terms for the MDP."""
+
+    terminating = RewTerm(func=mdp.is_terminated, weight=-50.0)
+
+    lateral_movement = RewTerm(func=mdp.lateral_movement, weight=-0.1)
+
+    backward_movement_penalty = RewTerm(func=mdp.backward_movement_penalty, weight=-0.0)
+
+    rot_movement = RewTerm(func=mdp.rot_movement, weight=-1e-5)
+
+    # Linear distance penalty — provides a consistent gradient at all distances.
+    position_linear = RewTerm(func=mdp.goal_distance_penalty, weight=-0.3)
+    # reach_goal_xyz for soft and tight is a work in progress
+
+    action_rate = RewTerm(func=mdp.action_rate_l1, weight=-0.01)
+
+    # Penalize velocity directed toward detected obstacles.
+    obstacle_approach = RewTerm(
+        func=mdp.obstacle_approach_penalty,
+        weight=-1.0,
+        params={
+            "sensor_cfg": SceneEntityCfg("ray_caster_cam"),
+            "danger_radius": 0.7,
+            "safe_dist_normalized": 0.85,
+        },
+    )
+
+    # Non-contributing reward term. Used to track success for curriculum.
+    track_success = RewTerm(
+        func=mdp.track_goal_reached,
+        params={
+            "promote_threshold": 0.05,
+        },
+        weight=1.0,
+    )
+
+
+
+@configclass
 class TerminationsCfg:
     """Termination terms for the MDP."""
 

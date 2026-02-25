@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from isaaclab.assets import Articulation
     from isaaclab.sensors import RayCaster
 
+
 def track_goal_reached(env: ManagerBasedRLEnv, promote_threshold: float = 0.05) -> torch.Tensor:
     """
     Increments ``terrain._success_count`` on goal reach; returns zero reward.
@@ -41,40 +42,124 @@ def track_goal_reached(env: ManagerBasedRLEnv, promote_threshold: float = 0.05) 
     return torch.zeros(env.num_envs, device=env.device)
 
 
-def blind_spot_velocity_penalty(
-        env: ManagerBasedRLEnv,
-        asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-        max_vx: float = 1.0,
-        max_vy: float = 1.0
-    ) -> torch.Tensor:
-      """
-      Penalizes backward and lateral movement, normalized by max velocities.
+def lateral_movement(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward the agent for moving laterally using L1-Kernel.
+    https://github.com/leggedrobotics/sru-navigation-sim
 
-      Assumes a forward-facing sensor — backward (vx < 0) and lateral (vy) motion
-      move the robot into unseen space. Returns ``clamp(-vx, 0)/max_vx + |vy|/max_vy``.
-      """
+    Args:
+        env: The learning environment.
+        asset_cfg: The name of the robot asset.
 
-      asset: Articulation = env.scene[asset_cfg.name] 
-      vel_b = asset.data.root_lin_vel_b[:, :2]  # (vx, vy) in body frame
+    Returns:
+        Dense reward [0, +1] based on the lateral velocity.
+    """
+    asset: Articulation = env.scene[asset_cfg.name]
+    # compute the reward
+    lateral_velocity = asset.data.root_lin_vel_b[:, 1]
+    reward = torch.abs(lateral_velocity)
+    return reward
 
-      # heading of velocity vector in body frame
-      vx = vel_b[:, 0]
-      vy = vel_b[:, 1]
 
-      # penalize backward movement
-      backward_penalty = torch.clamp(-vx, min=0.0) / max_vx  # only when vx < 0
+def rot_movement(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward the agent for rotating around the z-axis using an L2-Kernel.
+    https://github.com/leggedrobotics/sru-navigation-sim
+    
+    Args:
+        env: The learning environment.
+        asset_cfg: The name of the robot asset.
 
-      # penalize lateral movement (scaled by speed)
-      lateral_penalty = torch.abs(vy) / max_vy
+    Returns:
+        Dense reward [0, +1] based on the rotational velocity.
+    """
+    asset: Articulation = env.scene[asset_cfg.name]
+    rot_vel_norm = torch.norm(asset.data.root_ang_vel_b, dim=1)
+    return rot_vel_norm
 
-      # combine
-      return backward_penalty + lateral_penalty
+
+def action_rate_l1(env: "ManagerBasedRLEnv") -> torch.Tensor:
+    """Penalize the rate of change of the actions using L1 kernel.
+    https://github.com/leggedrobotics/sru-navigation-sim
+    """
+    return torch.sum(torch.abs(env.action_manager.action - env.action_manager.prev_action), dim=1)
 
 
 def goal_distance_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:                                                                                
     """Penalize distance to goal. Normalized by terrain tile size."""                                                                             
     command = env.command_manager.get_command("goal_pose")                                                                                        
     return torch.norm(command[:, :2], dim=1)
+
+
+def reach_goal_xyz(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    sigmoid: float,
+    T_r: float,
+    probability: float,
+    flat: bool,
+    ratio: bool,
+    ) -> torch.Tensor:
+    """Reward goal reaching with configurable sigmoid shaping.
+    https://github.com/leggedrobotics/sru-navigation-sim
+
+    Args:
+        env: The learning environment.
+        command_name: Name of the goal command.
+        sigmoid: Sigmoid parameter for shaping.
+        T_r: Time reward scaling factor.
+        probability: Probability of random sampling.
+        flat: Whether to only consider xy error (ignore z).
+        ratio: Whether to scale by travel distance ratio.
+
+    Returns:
+        Dense reward based on distance to goal.
+    """
+    goal_cmd_generator = env.command_manager._terms[command_name]
+    command = env.command_manager.get_command("goal_pose")
+
+    t = env.episode_length_buf
+    T = env.max_episode_length
+
+    xyz_error = torch.norm(command[:, :2], dim=1)
+    reward = 1 / (1 + torch.square(xyz_error / sigmoid)) / T_r
+
+    timeup_mask = t > (T - goal_cmd_generator.required_time_at_goal_in_steps) #ToDo: Figure this out
+    random_mask = torch.rand_like(t.float()) < probability
+    timeup_mask = torch.logical_or(timeup_mask, random_mask)
+
+    arrive_mask = goal_cmd_generator.time_at_goal > 0.0
+    reward_mask = torch.logical_or(timeup_mask, arrive_mask)
+
+    if ratio:
+        # Calculate the travel distance ratio relative to the initial goal distance
+        travel_distance = torch.max(
+            goal_cmd_generator.distance_traveled, goal_cmd_generator.initial_distance_to_goal #ToDo: Figure this out
+        )
+        travel_distance_ratio = goal_cmd_generator.initial_distance_to_goal / (travel_distance + 1e-6) #ToDo: Figure this out
+    else:
+        travel_distance_ratio = torch.ones_like(reward)
+
+    reward = reward * reward_mask.float() * travel_distance_ratio
+
+    return reward
+
+
+def backward_movement_penalty(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Small penalty for backward movement as a regularization term.
+    https://github.com/leggedrobotics/sru-navigation-sim
+
+    Args:
+        env: The learning environment.
+        asset_cfg: The name of the robot asset.
+
+    Returns:
+        Penalty [0, +1] based on backward velocity (to be used with negative weight).
+    """
+    asset: Articulation = env.scene[asset_cfg.name]
+    # compute the penalty
+    forward_velocity = asset.data.root_lin_vel_b[:, 0]
+    # Only penalize negative forward velocity (backward movement)
+    backward_velocity = torch.clamp(-forward_velocity, min=0.0, max=1.0)
+    return backward_velocity
 
 
 def goal_reached_bonus(env: ManagerBasedRLEnv, threshold: float = 0.5) -> torch.Tensor:
