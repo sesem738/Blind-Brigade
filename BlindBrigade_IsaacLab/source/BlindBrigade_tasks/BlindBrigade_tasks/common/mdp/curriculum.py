@@ -9,35 +9,22 @@ if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
 
-def terrain_levels_nav(
-        env: ManagerBasedRLEnv,
-        env_ids: torch.Tensor, 
-        promote_threshold: float = 0.1, 
-        demote_threshold: float = 0.2
-    ):
-    terrain = env.scene.terrain
-
-    # distance to goal at episode end
-    goal_dist = torch.norm(env.command_manager.get_command("goal_pose")[env_ids, :2], dim=1)
-
-    # promote: got close enough to goal
-    move_up = goal_dist < promote_threshold
-    # demote: stayed far from goal
-    move_down = goal_dist > demote_threshold
-    move_down *= ~move_up
-
-    terrain.update_env_origins(env_ids, move_up, move_down)
-    return torch.mean(terrain.terrain_levels.float())
-
 def terrain_levels_nav_success_based(
     env: ManagerBasedRLEnv,
     env_ids: torch.Tensor,
     min_successes: int = 3,
     ):
-    """Curriculum based on goal-reaching success count.
+    """Curriculum that adjusts terrain difficulty based on goal-reaching success.
 
-    Promote: reached enough goals AND survived (no collision death).
-    Demote: collision death OR reached no goals.
+    Promotes an environment to a harder terrain level when the agent reaches at
+    least ``min_successes`` goals in an episode without a collision termination.
+    Demotes on collision death or zero goals reached. Success counts persist across
+    timeouts and reset only on promotion or collision.
+
+    Requires ``terrain._success_count`` to be incremented externally (e.g. in a
+    reward or event term) whenever the agent reaches a goal.
+
+    Returns the mean terrain level across all environments.
     """
     terrain = env.scene.terrain
 
