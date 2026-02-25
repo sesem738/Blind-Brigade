@@ -442,7 +442,7 @@ class TerrainBasedPosition2dCommandCfg(TerrainBasedPose2dCommandCfg):
 
     class_type: type = TerrainBasedPosition2dCommand
 
-    resampling_time_range: tuple[float, float] = (float("inf"), float("inf"))
+    resampling_time_range: tuple[float, float] = (250.0, 250.0)
     """Resampling is disabled by default — goals only resample on goal reach."""
 
     goal_reached_threshold: float = 0.05
@@ -458,7 +458,7 @@ class ValidMaskPosition2dCommandCfg(ValidMaskPose2dCommandCfg):
 
     class_type: type = ValidMaskPosition2dCommand
 
-    resampling_time_range: tuple[float, float] = (float("inf"), float("inf"))
+    resampling_time_range: tuple[float, float] = (250.0, 250.0)
     """Resampling is disabled by default — goals only resample on goal reach."""
 
     goal_reached_threshold: float = 0.0

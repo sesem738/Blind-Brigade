@@ -201,7 +201,7 @@ class CommandCfg:
         ranges=mdp.TerrainBasedPosition2dCommandCfg.Ranges(
             heading=(-3.14, 3.14),
         ),
-        goal_reached_threshold=0.05,
+        goal_reached_threshold=0.1,
         debug_vis=True,
     )
 
