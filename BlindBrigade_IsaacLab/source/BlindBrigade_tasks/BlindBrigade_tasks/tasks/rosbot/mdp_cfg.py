@@ -12,7 +12,7 @@ from isaaclab.envs.mdp.terminations import illegal_contact
 from isaaclab_tasks.manager_based.navigation.mdp import (
     position_command_error_tanh,
 )
-from isaaclab.envs.mdp.commands import TerrainBasedPose2dCommandCfg
+# from isaaclab.envs.mdp.commands import TerrainBasedPose2dCommandCfg
 from BlindBrigade_tasks.common import mdp
 
 
@@ -196,13 +196,12 @@ class TerminationsCfg:
 class CommandCfg:
     """Commands for the rosbot."""
 
-    goal_pose = TerrainBasedPose2dCommandCfg(
+    goal_pose = mdp.TerrainBasedPosition2dCommandCfg(
         asset_name="robot",
-        ranges=TerrainBasedPose2dCommandCfg.Ranges(
+        ranges=mdp.TerrainBasedPosition2dCommandCfg.Ranges(
             heading=(-3.14, 3.14),
         ),
-        resampling_time_range=(5.0, 5.0),
-        simple_heading=False,
+        goal_reached_threshold=0.05,
         debug_vis=True,
     )
 

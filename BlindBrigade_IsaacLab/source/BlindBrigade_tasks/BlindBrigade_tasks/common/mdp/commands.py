@@ -1,9 +1,12 @@
-"""Command generator that samples goals/spawns from terrain valid_mask.
+"""Custom command generators for terrain-based navigation.
 
-Outputs the same (num_envs, 4) format as TerrainBasedPose2dCommand:
-  [pos_x_body, pos_y_body, pos_z_body, heading_error]
+ValidMaskPose2dCommand:
+  Samples goals/spawns from terrain valid_mask.
+  Outputs (num_envs, 4): [pos_x_body, pos_y_body, pos_z_body, heading_error]
 
-This allows reuse of all existing rosbot observations, rewards, and terminations.
+ValidMaskPosition2dCommand / TerrainBasedPosition2dCommand:
+  Thin wrappers that output only (num_envs, 2): [pos_x_body, pos_y_body]
+  All sampling logic is inherited; only the `command` property is overridden.
 """
 
 from __future__ import annotations
@@ -14,6 +17,8 @@ from typing import TYPE_CHECKING, Tuple
 import torch
 
 from isaaclab.assets import Articulation
+from isaaclab.envs.mdp.commands import TerrainBasedPose2dCommand
+from isaaclab.envs.mdp.commands.commands_cfg import TerrainBasedPose2dCommandCfg
 from isaaclab.managers import CommandTerm, CommandTermCfg
 from isaaclab.markers import VisualizationMarkers
 from isaaclab.markers.config import CUBOID_MARKER_CFG
@@ -375,3 +380,86 @@ class ValidMaskPose2dCommandCfg(CommandTermCfg):
         heading: tuple[float, float] = (-3.14, 3.14)
 
     ranges: Ranges = Ranges()
+
+
+# =============================================================================
+# 2D Position-Only Commands  (drop z and heading — output shape: (N, 2))
+# =============================================================================
+
+class TerrainBasedPosition2dCommand(TerrainBasedPose2dCommand):
+    """Terrain-based command that outputs only (x, y) in body frame.
+
+    Inherits all terrain-patch sampling from TerrainBasedPose2dCommand.
+    Optionally resamples the goal when the robot reaches it — set
+    ``cfg.goal_reached_threshold > 0`` to enable.
+    """
+
+    cfg: TerrainBasedPosition2dCommandCfg
+
+    @property
+    def command(self) -> torch.Tensor:
+        """The desired 2D position in base frame. Shape is (num_envs, 2)."""
+        return self.pos_command_b[:, :2]
+
+    def _update_command(self):
+        if self.cfg.goal_reached_threshold > 0.0:
+            dist = torch.norm(self.pos_command_b[:, :2], dim=1)
+            reached = (dist < self.cfg.goal_reached_threshold).nonzero(as_tuple=False).flatten()
+            if len(reached) > 0:
+                self.time_left[reached] = 0.0
+        super()._update_command()
+
+
+class ValidMaskPosition2dCommand(ValidMaskPose2dCommand):
+    """ValidMask-based command that outputs only (x, y) in body frame.
+
+    Inherits all mask-based terrain sampling from ValidMaskPose2dCommand.
+    Optionally resamples the goal when the robot reaches it — set
+    ``cfg.goal_reached_threshold > 0`` to enable.
+    """
+
+    cfg: ValidMaskPosition2dCommandCfg
+
+    @property
+    def command(self) -> torch.Tensor:
+        """The desired 2D position in base frame. Shape is (num_envs, 2)."""
+        return self.pos_command_b[:, :2]
+
+    def _update_command(self):
+        # Check distance using pos_command_b from the previous step — i.e. what
+        # the policy observed this step — before the parent re-transforms it.
+        if self.cfg.goal_reached_threshold > 0.0:
+            dist = torch.norm(self.pos_command_b[:, :2], dim=1)
+            reached = (dist < self.cfg.goal_reached_threshold).nonzero(as_tuple=False).flatten()
+            if len(reached) > 0:
+                self.time_left[reached] = 0.0
+        super()._update_command()
+
+
+@configclass
+class TerrainBasedPosition2dCommandCfg(TerrainBasedPose2dCommandCfg):
+    """Configuration for TerrainBasedPosition2dCommand."""
+
+    class_type: type = TerrainBasedPosition2dCommand
+
+    resampling_time_range: tuple[float, float] = (float("inf"), float("inf"))
+    """Resampling is disabled by default — goals only resample on goal reach."""
+
+    goal_reached_threshold: float = 0.05
+    """Distance (m) at which the goal is considered reached and resampled next step."""
+
+    simple_heading: bool = False
+    """Whether to use simple heading or not. Set to false for 2D position."""
+
+
+@configclass
+class ValidMaskPosition2dCommandCfg(ValidMaskPose2dCommandCfg):
+    """Configuration for ValidMaskPosition2dCommand."""
+
+    class_type: type = ValidMaskPosition2dCommand
+
+    resampling_time_range: tuple[float, float] = (float("inf"), float("inf"))
+    """Resampling is disabled by default — goals only resample on goal reach."""
+
+    goal_reached_threshold: float = 0.0
+    """Distance (m) at which the goal is considered reached and resampled next step."""
