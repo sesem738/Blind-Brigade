@@ -129,7 +129,7 @@ def reach_goal_xyz(
     xyz_error = torch.norm(command[:, :2], dim=1)
     reward = 1 / (1 + torch.square(xyz_error / sigmoid)) / T_r
 
-    timeup_mask = t > (T - T_r) # ABS authors use 
+    timeup_mask = t > (T - T_r) # ABS does this, SRU does it a little differently 
     random_mask = torch.rand_like(t.float()) < probability
     timeup_mask = torch.logical_or(timeup_mask, random_mask)
 
