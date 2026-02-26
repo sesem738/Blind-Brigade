@@ -32,6 +32,7 @@ def terrain_levels_nav_success_based(
     if not hasattr(terrain, "_success_count"):
         terrain._success_count = torch.zeros(env.num_envs, device=env.device)
         terrain._was_near_goal = torch.zeros(env.num_envs, device=env.device)
+        terrain._time_at_goal = torch.zeros(env.num_envs, device=env.device)
 
     # check if terminated by collision (not timeout)
     collision_death = (
@@ -52,6 +53,7 @@ def terrain_levels_nav_success_based(
     reset_ids = env_ids[reset_mask]
     terrain._success_count[reset_ids] = 0
     terrain._was_near_goal[reset_ids] = 0
+    terrain._time_at_goal[reset_ids] = 0
 
     return torch.mean(terrain.terrain_levels.float())
 

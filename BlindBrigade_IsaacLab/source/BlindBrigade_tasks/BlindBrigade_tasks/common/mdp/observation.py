@@ -22,18 +22,18 @@ def base_yaw_rate(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntit
 
 def height_scan_normalized(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
     """
-    Height scan from a RayCaster, normalized to [0, 2] by ``max_distance`` and flattened to (B, N).
+    Height scan from a RayCaster, normalized to [-1, 1] by ``max_distance`` and flattened to (B, N).
     """
     distances = height_scan(env=env, sensor_cfg=sensor_cfg, offset=0.0)
     distances = torch.nan_to_num(
         input=distances, 
-        nan=env.scene.sensors[sensor_cfg.name].cfg.max_distance * 2
+        nan=-env.scene.sensors[sensor_cfg.name].cfg.max_distance
     )
     distances = torch.clamp(
         input=distances, 
-        min=-(env.scene.sensors[sensor_cfg.name].cfg.max_distance * 2),
-        max= (env.scene.sensors[sensor_cfg.name].cfg.max_distance * 2)
-    ) / (env.scene.sensors[sensor_cfg.name].cfg.max_distance + 0.01)
+        min=-(env.scene.sensors[sensor_cfg.name].cfg.max_distance),
+        max= (env.scene.sensors[sensor_cfg.name].cfg.max_distance)
+    ) / (env.scene.sensors[sensor_cfg.name].cfg.max_distance + 1e-6)
     
     return distances
 

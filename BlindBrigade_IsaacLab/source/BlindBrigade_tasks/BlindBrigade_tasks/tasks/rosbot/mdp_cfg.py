@@ -42,7 +42,7 @@ class ObservationsCfg:
         pose_command  = ObsTerm(func=mdp.generated_commands,     params={"command_name": "goal_pose"})
         base_lin_vel  = ObsTerm(func=mdp.base_lin_vel,           clip=(-1.0, 1.0))
         base_yaw_rate = ObsTerm(func=mdp.base_yaw_rate,          clip=(-2.0, 2.0))
-        height_scan   = ObsTerm(func=mdp.height_scan_normalized, clip=(0.0, 2.0), params={"sensor_cfg": SceneEntityCfg("ray_caster_cam")})
+        height_scan   = ObsTerm(func=mdp.height_scan_normalized, clip=(-1.0, 1.0), params={"sensor_cfg": SceneEntityCfg("ray_caster_cam")})
         last_action   = ObsTerm(func=mdp.last_action,            clip=(-1.0, 1.0))
 
         def __post_init__(self) -> None:
@@ -56,7 +56,7 @@ class ObservationsCfg:
         pose_command  = ObsTerm(func=mdp.generated_commands,     params={"command_name": "goal_pose"})
         base_lin_vel  = ObsTerm(func=mdp.base_lin_vel,           clip=(-1.0, 1.0))
         base_yaw_rate = ObsTerm(func=mdp.base_yaw_rate,          clip=(-2.0, 2.0))
-        height_scan   = ObsTerm(func=mdp.height_scan_normalized, clip=(0.0, 2.0), params={"sensor_cfg": SceneEntityCfg("ray_caster_cam")})
+        height_scan   = ObsTerm(func=mdp.height_scan_normalized, clip=(-1.0, 1.0), params={"sensor_cfg": SceneEntityCfg("ray_caster_cam")})
         last_action   = ObsTerm(func=mdp.last_action,            clip=(-1.0, 1.0))
 
         def __post_init__(self) -> None:
@@ -68,7 +68,7 @@ class ObservationsCfg:
         """Flat RayCaster state for MLP branch of CNN policy."""
         height_scan = ObsTerm(
             func=mdp.height_scan_normalized,
-            clip=(0.0, 2.0), 
+            clip=(-1.0, 1.0), 
             params={"sensor_cfg": SceneEntityCfg("ray_caster_cam")}
         )
         
@@ -172,7 +172,7 @@ class RewardsCfg:
     track_success = RewTerm(
         func=mdp.track_goal_reached,
         params={
-            "promote_threshold": 0.05,
+            "goal_dist_threshold": 0.1,
         },
         weight=1.0,
     )
@@ -190,28 +190,26 @@ class SRURewardsCfg:
 
     rot_movement = RewTerm(func=mdp.rot_movement, weight=-1e-5)
 
-    # Linear distance penalty — provides a consistent gradient at all distances.
-    position_linear = RewTerm(func=mdp.goal_distance_penalty, weight=-0.3)
-    # reach_goal_xyz for soft and tight is a work in progress
-
-    action_rate = RewTerm(func=mdp.action_rate_l1, weight=-0.01)
-
-    # Penalize velocity directed toward detected obstacles.
-    obstacle_approach = RewTerm(
-        func=mdp.obstacle_approach_penalty,
-        weight=-1.0,
-        params={
-            "sensor_cfg": SceneEntityCfg("ray_caster_cam"),
-            "danger_radius": 0.7,
-            "safe_dist_normalized": 0.85,
-        },
+    # Goal rewards
+    reach_goal_xy_soft = RewTerm(
+        func=mdp.reach_goal_xyz,
+        weight=0.25,
+        params={"command_name": "goal_pose", "sigmoid": 2.5, "T_r": 1.0, "probability": 0.01},
     )
+
+    reach_goal_xy_tight = RewTerm(
+        func=mdp.reach_goal_xyz,
+        weight=1.5,
+        params={"command_name": "goal_pose", "sigmoid": 0.25, "T_r": 0.1, "probability": 0.01},
+    )
+    
+    action_rate = RewTerm(func=mdp.action_rate_l1, weight=-0.1)
 
     # Non-contributing reward term. Used to track success for curriculum.
     track_success = RewTerm(
         func=mdp.track_goal_reached,
         params={
-            "promote_threshold": 0.05,
+            "goal_dist_threshold": 0.1,
         },
         weight=1.0,
     )
@@ -241,8 +239,8 @@ class CommandCfg:
         ranges=mdp.TerrainBasedPosition2dCommandCfg.Ranges(
             heading=(-3.14, 3.14),
         ),
-        resampling_time_range=(20.0,20.0),
-        goal_reached_threshold=0.1,
+        resampling_time_range=(1e9, 1e9),   # Large values to disable automatic resampling
+        goal_reached_threshold=None,        # None to disable goal resampling on reached
         debug_vis=True,
     )
 
@@ -253,30 +251,6 @@ class CurriculumCfg:
 
     terrain_level = CurriculumTerm(func=mdp.terrain_levels_nav_success_based)
 
-    # Term scales min resampling time considering curriculum progress up to scheduled iterations
-    # e.g., resampling time (20.0,20.0) -> (5.0, 20.0) in 0 to 250 epochs
-    goal_resample_time = CurriculumTerm(
-        func=mdp.goal_ramp_resample_time_by_iteration,
-        params={
-            "command_name": "goal_pose",
-            "schedule_iterations": 250,
-            "min_resample_time_s": 5.0,
-            "max_resample_time_s": 20.0,
-            "num_steps_per_env": 64,    # Must match rsl config
-        },
-    )
-
-    # Term sets (min, max)_at specified training iteration 
-    # goal_resample_time = CurriculumTerm(
-    #     func=mdp.goal_step_resample_time_at_iteration,
-    #     params={
-    #         "command_name": "goal_pose",
-    #         "schedule_iterations": 150,
-    #         "num_steps_per_env": 64,    # Must match rsl config
-    #         "max_resample_time_s": 20.0,
-    #         "min_resample_time_s": 5.0,
-    #     },
-    # )
 
 @configclass
 class RosbotActionCfg:

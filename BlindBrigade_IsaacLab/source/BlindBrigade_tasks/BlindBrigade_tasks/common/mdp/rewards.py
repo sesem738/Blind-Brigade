@@ -12,32 +12,42 @@ if TYPE_CHECKING:
     from isaaclab.sensors import RayCaster
 
 
-def track_goal_reached(env: ManagerBasedRLEnv, promote_threshold: float = 0.05) -> torch.Tensor:
+def track_goal_reached(env: ManagerBasedRLEnv, goal_dist_threshold: float = 0.05) -> torch.Tensor:
     """
     Increments ``terrain._success_count`` on goal reach; returns zero reward.
 
     Counts once per goal on transition into ``promote_threshold``, not per step.
     The count is consumed by the curriculum term to decide promotion/demotion.
-    Also logs ``goal_dist_min/mean`` and ``success_count`` to ``env.extras``.
+    Also tracks cumulative time (steps) spent at the goal in
+    ``terrain._time_at_goal`` — every step within ``promote_threshold`` counts,
+    regardless of whether the robot left and came back.
+    Logs ``goal_dist_min/mean``, ``success_count``, and ``time_at_goal`` to
+    ``env.extras``.
     """
 
     terrain = env.scene.terrain
     if not hasattr(terrain, "_success_count"):
         terrain._success_count = torch.zeros(env.num_envs, device=env.device)
         terrain._was_near_goal = torch.zeros(env.num_envs, device=env.device)
+        terrain._time_at_goal = torch.zeros(env.num_envs, device=env.device)
 
+    # Check if close to goal
     goal_dist = torch.norm(env.command_manager.get_command("goal_pose")[:, :2], dim=1)
-    is_near = (goal_dist < promote_threshold).float()
+    is_near = (goal_dist < goal_dist_threshold).float()
 
     # only count the transition from not-near to near (once per goal)
     newly_reached = is_near * (1.0 - terrain._was_near_goal)
     terrain._success_count += newly_reached
     terrain._was_near_goal = is_near
 
+    # accumulate every step spent at goal (not necessarily continuous)
+    terrain._time_at_goal[is_near.bool()] += env.step_dt
+
     # store for logging
     env.extras["log"]["goal_dist_min"]  = goal_dist.min()
     env.extras["log"]["goal_dist_mean"] = goal_dist.mean()
     env.extras["log"]["success_count"]  = terrain._success_count.mean()
+    env.extras["log"]["time_at_goal"]   = terrain._time_at_goal.mean()
 
     return torch.zeros(env.num_envs, device=env.device)
 
@@ -83,7 +93,7 @@ def action_rate_l1(env: "ManagerBasedRLEnv") -> torch.Tensor:
     return torch.sum(torch.abs(env.action_manager.action - env.action_manager.prev_action), dim=1)
 
 
-def goal_distance_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:                                                                                
+def goal_distance_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize distance to goal. Normalized by terrain tile size."""                                                                             
     command = env.command_manager.get_command("goal_pose")                                                                                        
     return torch.norm(command[:, :2], dim=1)
@@ -95,8 +105,6 @@ def reach_goal_xyz(
     sigmoid: float,
     T_r: float,
     probability: float,
-    flat: bool,
-    ratio: bool,
     ) -> torch.Tensor:
     """Reward goal reaching with configurable sigmoid shaping.
     https://github.com/leggedrobotics/sru-navigation-sim
@@ -107,12 +115,11 @@ def reach_goal_xyz(
         sigmoid: Sigmoid parameter for shaping.
         T_r: Time reward scaling factor.
         probability: Probability of random sampling.
-        flat: Whether to only consider xy error (ignore z).
-        ratio: Whether to scale by travel distance ratio.
 
     Returns:
         Dense reward based on distance to goal.
     """
+    terrain = env.scene.terrain
     goal_cmd_generator = env.command_manager._terms[command_name]
     command = env.command_manager.get_command("goal_pose")
 
@@ -122,23 +129,14 @@ def reach_goal_xyz(
     xyz_error = torch.norm(command[:, :2], dim=1)
     reward = 1 / (1 + torch.square(xyz_error / sigmoid)) / T_r
 
-    timeup_mask = t > (T - goal_cmd_generator.required_time_at_goal_in_steps) #ToDo: Figure this out
+    timeup_mask = t > (T - T_r) # ABS authors use 
     random_mask = torch.rand_like(t.float()) < probability
     timeup_mask = torch.logical_or(timeup_mask, random_mask)
 
-    arrive_mask = goal_cmd_generator.time_at_goal > 0.0
+    arrive_mask = terrain._time_at_goal > 0.0
     reward_mask = torch.logical_or(timeup_mask, arrive_mask)
 
-    if ratio:
-        # Calculate the travel distance ratio relative to the initial goal distance
-        travel_distance = torch.max(
-            goal_cmd_generator.distance_traveled, goal_cmd_generator.initial_distance_to_goal #ToDo: Figure this out
-        )
-        travel_distance_ratio = goal_cmd_generator.initial_distance_to_goal / (travel_distance + 1e-6) #ToDo: Figure this out
-    else:
-        travel_distance_ratio = torch.ones_like(reward)
-
-    reward = reward * reward_mask.float() * travel_distance_ratio
+    reward = reward * reward_mask.float()
 
     return reward
 

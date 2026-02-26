@@ -5,7 +5,7 @@ from isaaclab.utils import configclass
 from .scene_cfg import ROSBotSceneCfg
 from .mdp_cfg import (
     ObservationsCfg,
-    RewardsCfg,
+    SRURewardsCfg,
     TerminationsCfg,
     EventCfg,
     CommandCfg,
@@ -27,7 +27,7 @@ class RosbotNavBoxTerrainEnvCfg(ManagerBasedRLEnvCfg):
     observations: ObservationsCfg = ObservationsCfg()
     actions: RosbotActionCfg = RosbotActionCfg()
     # MDP settings
-    rewards: RewardsCfg = RewardsCfg()
+    rewards: SRURewardsCfg = SRURewardsCfg()
     terminations: TerminationsCfg = TerminationsCfg()
 
     curriculum: CurriculumCfg = CurriculumCfg()
@@ -38,7 +38,7 @@ class RosbotNavBoxTerrainEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 3  # 40 Hz
-        self.episode_length_s = 20
+        self.episode_length_s = 10
         # viewer settings
         self.viewer.eye = (8.0, 0.0, 5.0)
         # simulation settings

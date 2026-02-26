@@ -402,7 +402,7 @@ class TerrainBasedPosition2dCommand(TerrainBasedPose2dCommand):
         return self.pos_command_b[:, :2]
 
     def _update_command(self):
-        if self.cfg.goal_reached_threshold > 0.0:
+        if self.cfg.goal_reached_threshold is not None:
             dist = torch.norm(self.pos_command_b[:, :2], dim=1)
             reached = (dist < self.cfg.goal_reached_threshold).nonzero(as_tuple=False).flatten()
             if len(reached) > 0:
@@ -443,7 +443,7 @@ class TerrainBasedPosition2dCommandCfg(TerrainBasedPose2dCommandCfg):
     class_type: type = TerrainBasedPosition2dCommand
 
 
-    goal_reached_threshold: float = 0.05
+    goal_reached_threshold: float | None = 0.05
     """Distance (m) at which the goal is considered reached and resampled next step."""
 
     simple_heading: bool = False
