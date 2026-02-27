@@ -120,7 +120,9 @@ def reach_goal_xyz(
         Dense reward based on distance to goal.
     """
     terrain = env.scene.terrain
-    goal_cmd_generator = env.command_manager._terms[command_name]
+    if not hasattr(terrain, "_time_at_goal"):
+        terrain._time_at_goal = torch.zeros(env.num_envs, device=env.device)
+    
     command = env.command_manager.get_command("goal_pose")
 
     t = env.episode_length_buf
