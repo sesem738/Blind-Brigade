@@ -33,6 +33,7 @@ gym.register(
     kwargs={
         "env_cfg_entry_point": f"{__name__}.rosbot_env_cfg:RosbotNavBoxTerrainEnvCfg",
         "rsl_rl_cfg_entry_point":               f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerBoxCfg",
+        "rsl_rl_distil_cfg_entry_point":        f"{agents.__name__}.rsl_rl_distillation_cfg:PPORunnerBoxDistillationCfg",
         "rsl_rl_gru_cfg_entry_point":           f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerBoxRecurrentRayCastCfg",
         "rsl_rl_cnn_cfg_entry_point":           f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerBoxCnnCfg",
         "rsl_rl_recurrent_cnn_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerBoxRecurrentCnnCfg",
@@ -46,6 +47,7 @@ gym.register(
     kwargs={
         "env_cfg_entry_point": f"{__name__}.rosbot_env_cfg:RosbotNavBoxTerrainEnvPLAYCfg",
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerBoxCfg",
+        "rsl_rl_distil_cfg_entry_point": f"{agents.__name__}.rsl_rl_distillation_cfg:PPORunnerBoxDistillationCfg",
         "rsl_rl_gru_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerBoxRecurrentRayCastCfg",
     },
 )

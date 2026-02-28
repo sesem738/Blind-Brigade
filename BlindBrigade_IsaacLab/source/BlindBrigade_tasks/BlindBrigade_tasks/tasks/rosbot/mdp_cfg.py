@@ -109,8 +109,7 @@ class ObservationsCfg:
 
         depth_map = ObsTerm(
             func=mdp.camera_image,
-            clip=(0.0, 1.0),
-            params={"sensor_cfg": SceneEntityCfg("ray_caster_cam")},
+            params={"sensor_cfg": SceneEntityCfg("zed2_camera")},
         )
 
         def __post_init__(self):
@@ -121,7 +120,7 @@ class ObservationsCfg:
     policy: PolicyCfg = PolicyCfg()
     critic: CriticCfg = CriticCfg()
     proprioceptive: ProprioceptiveCfg = ProprioceptiveCfg()
-    exteroceptive: ExteroceptiveRayCasterCfg = ExteroceptiveRayCasterCfg()
+    exteroceptive: ExteroceptiveCameraCfg = ExteroceptiveCameraCfg()
     heightscan: HeightScanCfg = HeightScanCfg()
 
 
@@ -186,7 +185,7 @@ class SRURewardsCfg:
 
     lateral_movement = RewTerm(func=mdp.lateral_movement, weight=-0.1)
 
-    backward_movement_penalty = RewTerm(func=mdp.backward_movement_penalty, weight=-0.0)
+    backward_movement_penalty = RewTerm(func=mdp.backward_movement_penalty, weight=-0.1)
 
     rot_movement = RewTerm(func=mdp.rot_movement, weight=-1e-5)
 
