@@ -47,7 +47,11 @@ class PPORunnerFlatCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 16
     max_iterations = 2000
     save_interval = 50
-    experiment_name = "rosbot_flat"
+    experiment_name = "rosbot_p2p"
+    obs_groups = {
+        "policy": ["proprioceptive"],
+        "critic": ["proprioceptive"],
+    }
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,
         actor_obs_normalization=False,

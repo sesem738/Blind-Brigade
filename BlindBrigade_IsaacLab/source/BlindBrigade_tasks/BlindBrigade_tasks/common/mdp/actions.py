@@ -29,6 +29,8 @@ class SE2BaseMecanumDrive(ActionTerm):
         # Find joint indices for the wheel joints
         self._wheel_joint_ids, _ = self._asset.find_joints(list(cfg.wheel_joints))
         self._prev_vel_cmd = torch.zeros(env.num_envs, 3, device=self.device)
+        # Low-pass filter state
+        self._lpf_state = torch.zeros(env.num_envs, 3, device=self.device)
 
     @property
     def action_dim(self) -> int:
@@ -44,7 +46,10 @@ class SE2BaseMecanumDrive(ActionTerm):
 
     def process_actions(self, actions: torch.Tensor):
         self._raw_actions = actions.clone()
-        scaled_actions = actions * torch.tensor([self.cfg.max_vx, self.cfg.max_vy, self.cfg.max_wz], device=self.device)
+        # Single-pole low-pass filter: y = α·x + (1-α)·y_prev
+        alpha = self.cfg.action_lpf_alpha
+        self._lpf_state = alpha * actions + (1.0 - alpha) * self._lpf_state
+        scaled_actions = self._lpf_state * torch.tensor([self.cfg.max_vx, self.cfg.max_vy, self.cfg.max_wz], device=self.device)
         self._processed_actions = torch.clamp(
             scaled_actions,
             min=torch.tensor([-self.cfg.max_vx, -self.cfg.max_vy, -self.cfg.max_wz], device=self.device),
@@ -94,19 +99,23 @@ class SE2BaseMecanumDrive(ActionTerm):
             wheel_vel_targets = torch.stack([w_fl, w_fr, w_rl, w_rr], dim=-1)
             self._asset.set_joint_velocity_target(wheel_vel_targets, joint_ids=self._wheel_joint_ids)
 
-        # Only set linear velocity for base (wheels don't move)
-        root_vel = self._asset.data.root_vel_w.clone()  # preserve current velocity (including gravity)
+        # Build root velocity from sim state, then overwrite commanded components
+        cur_vel = self._asset.data.root_vel_w
+        root_vel = torch.zeros(self.num_envs, 6, device=self.device)
+        root_vel[:, 2] = cur_vel[:, 2]  # preserve vz for gravity
+        # Damp roll/pitch rates to prevent runaway tilting while allowing slope response
+        root_vel[:, 3:5] = cur_vel[:, 3:5] * self.cfg.rp_damping
 
         # Transform body-frame linear and angular velocities to world-frame
         root_vel[:, :2] = quat_apply(
-            self._asset.data.root_quat_w, 
+            self._asset.data.root_quat_w,
             torch.stack((vx, vy, torch.zeros_like(vx)), dim=-1)
-        )[:, :2] # only x, y
+        )[:, :2]
 
         root_vel[:, 5] = quat_apply(
-            self._asset.data.root_quat_w, 
+            self._asset.data.root_quat_w,
             torch.stack((torch.zeros_like(wz), torch.zeros_like(wz), wz), dim=-1)
-        )[:, 2] # only yaw
+        )[:, 2]
 
         self._asset.write_root_velocity_to_sim(root_vel)
         self._prev_vel_cmd = self._processed_actions.clone()
@@ -115,6 +124,7 @@ class SE2BaseMecanumDrive(ActionTerm):
         if env_ids is None:
             env_ids = torch.arange(self.num_envs, device=self.device)
         self._prev_vel_cmd[env_ids] = 0.0
+        self._lpf_state[env_ids] = 0.0
 
 
 @configclass
@@ -149,3 +159,9 @@ class SE2BaseMecanumDriveCfg(ActionTermCfg):
 
     # If True: also spin wheels; if False: only move base
     animate_wheels: bool = True
+
+    # Low-pass filter alpha (0→1): 1.0 = no filtering, lower = smoother
+    action_lpf_alpha: float = 1.0
+
+    # Per-step multiplier on roll/pitch angular velocity (0.0 = zero out, 1.0 = preserve fully)
+    rp_damping: float = 0.0

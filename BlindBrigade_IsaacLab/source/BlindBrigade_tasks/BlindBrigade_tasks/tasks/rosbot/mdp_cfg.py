@@ -133,9 +133,9 @@ class ObservationsCfg:
     policy: PolicyCfg = PolicyCfg()
     critic: CriticCfg = CriticCfg()
     proprioceptive: ProprioceptiveCfg = ProprioceptiveCfg()
-    exteroceptive: ExteroceptiveCameraCfg = ExteroceptiveCameraCfg()
-    exteroceptive_flat: ExteroceptiveCameraFlatCfg = ExteroceptiveCameraFlatCfg()
-    heightscan: HeightScanCfg = HeightScanCfg()
+    # exteroceptive: ExteroceptiveCameraCfg = ExteroceptiveCameraCfg()
+    # exteroceptive_flat: ExteroceptiveCameraFlatCfg = ExteroceptiveCameraFlatCfg()
+    # heightscan: HeightScanCfg = HeightScanCfg()
 
 
 @configclass
@@ -197,9 +197,9 @@ class SRURewardsCfg:
 
     terminating = RewTerm(func=mdp.is_terminated, weight=-50.0)
 
-    # lateral_movement = RewTerm(func=mdp.lateral_movement, weight=-0.1)
+    lateral_movement = RewTerm(func=mdp.lateral_movement, weight=-0.1)
 
-    # backward_movement_penalty = RewTerm(func=mdp.backward_movement_penalty, weight=-0.1)
+    backward_movement_penalty = RewTerm(func=mdp.backward_movement_penalty, weight=-0.1)
 
     rot_movement = RewTerm(func=mdp.rot_movement, weight=-1e-5)
 
@@ -216,9 +216,13 @@ class SRURewardsCfg:
         params={"command_name": "goal_pose", "sigmoid": 0.25, "T_r": 0.1, "probability": 0.01},
     )
     
-    heading_velocity_alignment = RewTerm(func=mdp.heading_velocity_alignment, weight=-0.2)
+    heading_velocity_alignment = RewTerm(
+        func=mdp.heading_velocity_alignment, 
+        weight=-0.2,
+        params={"asset_cfg": SceneEntityCfg("robot"), "max_speed": 0.5},
+    )
 
-    action_rate = RewTerm(func=mdp.action_rate_l1, weight=-0.1)
+    action_rate = RewTerm(func=mdp.action_rate_l1, weight=-0.2)
 
     # Non-contributing reward term. Used to track success for curriculum.
     track_success = RewTerm(
@@ -239,7 +243,7 @@ class TerminationsCfg:
     terrain_contact = DoneTerm(
         func=illegal_contact,
         params={
-            "threshold": 45,
+            "threshold": 1.0,
             "sensor_cfg": SceneEntityCfg("robot_contact_sensor"),
         },
     )

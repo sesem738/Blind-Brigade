@@ -235,7 +235,7 @@ def obstacle_approach_penalty(
 def heading_velocity_alignment(
     env: ManagerBasedRLEnv,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-    max_speed: float = 0.5,
+    max_speed: float = 0.2,
 ) -> torch.Tensor:
     """Penalize misalignment between heading and velocity direction.
 
