@@ -116,11 +116,25 @@ class ObservationsCfg:
             self.enable_corruption = False
             self.concatenate_terms = True  # single 4D term → stays (B, 1, 64, 64)
 
+    @configclass
+    class ExteroceptiveCameraFlatCfg(ObsGroup):
+        """Flattened ZED2 depth image for MLP encoder branch — outputs (B, H*W)."""
+
+        depth_map = ObsTerm(
+            func=mdp.camera_image,
+            params={"sensor_cfg": SceneEntityCfg("zed2_camera"), "flatten": True},
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = False
+            self.concatenate_terms = True  # single 1D term → stays (B, H*W)
+
     # observation groups
     policy: PolicyCfg = PolicyCfg()
     critic: CriticCfg = CriticCfg()
     proprioceptive: ProprioceptiveCfg = ProprioceptiveCfg()
     exteroceptive: ExteroceptiveCameraCfg = ExteroceptiveCameraCfg()
+    exteroceptive_flat: ExteroceptiveCameraFlatCfg = ExteroceptiveCameraFlatCfg()
     heightscan: HeightScanCfg = HeightScanCfg()
 
 
@@ -183,9 +197,9 @@ class SRURewardsCfg:
 
     terminating = RewTerm(func=mdp.is_terminated, weight=-50.0)
 
-    lateral_movement = RewTerm(func=mdp.lateral_movement, weight=-0.1)
+    # lateral_movement = RewTerm(func=mdp.lateral_movement, weight=-0.1)
 
-    backward_movement_penalty = RewTerm(func=mdp.backward_movement_penalty, weight=-0.1)
+    # backward_movement_penalty = RewTerm(func=mdp.backward_movement_penalty, weight=-0.1)
 
     rot_movement = RewTerm(func=mdp.rot_movement, weight=-1e-5)
 
@@ -202,6 +216,8 @@ class SRURewardsCfg:
         params={"command_name": "goal_pose", "sigmoid": 0.25, "T_r": 0.1, "probability": 0.01},
     )
     
+    heading_velocity_alignment = RewTerm(func=mdp.heading_velocity_alignment, weight=-0.2)
+
     action_rate = RewTerm(func=mdp.action_rate_l1, weight=-0.1)
 
     # Non-contributing reward term. Used to track success for curriculum.

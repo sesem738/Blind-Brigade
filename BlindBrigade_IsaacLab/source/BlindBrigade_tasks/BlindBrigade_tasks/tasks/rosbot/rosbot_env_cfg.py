@@ -47,7 +47,7 @@ class RosbotNavBoxTerrainEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.physx.gpu_max_rigid_patch_count = 200000  # For large number of flat patches
         # Disable ZED2 camera during training — GPU rendering scales badly with num_envs.
         # Training uses ray_caster_cam (efficient) for depth observations.
-        self.scene.zed2_camera = None
+        # self.scene.zed2_camera = None
 
 
 @configclass

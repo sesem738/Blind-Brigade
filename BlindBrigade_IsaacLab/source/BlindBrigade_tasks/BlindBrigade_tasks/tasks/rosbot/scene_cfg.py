@@ -123,7 +123,7 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
     zed2_camera: TiledCameraCfg = TiledCameraCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base_link/zed2_camera",
         update_period=1.0 / 30.0,  # 30 Hz, matching ZED 2 HD1080 mode
-        data_types=["depth"],
+        data_types=["distance_to_image_plane"],
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=2.12,           # mm
             horizontal_aperture=6.05,    # mm  2 × 2.12 × tan(110/2°) ≈ 6.05 mm

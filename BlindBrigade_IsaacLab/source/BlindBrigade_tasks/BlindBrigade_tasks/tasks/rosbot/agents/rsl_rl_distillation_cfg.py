@@ -66,13 +66,13 @@ class PPORunnerBoxDistillationCNNCfg(RslRlDistillationRunnerCfg):
     max_iterations = 300
     save_interval = 50
     experiment_name = "box_reward_trials"
-    obs_groups = {"policy": ["policy", "exteroceptive"], "teacher": ["policy"]}
+    obs_groups = {"policy": ["proprioceptive", "exteroceptive"], "teacher": ["policy"]}
     policy = RslRlDistillationStudentTeacherCNNCfg(
         init_noise_std=0.1,
         noise_std_type="scalar",
         student_obs_normalization=False,
         teacher_obs_normalization=False,
-        student_hidden_dims=[256, 128, 128],
+        student_hidden_dims=[128, 128],
         teacher_hidden_dims=[256, 128, 128],
         activation="elu",
         student_image_groups=["exteroceptive"],
@@ -89,5 +89,39 @@ class PPORunnerBoxDistillationCNNCfg(RslRlDistillationRunnerCfg):
     algorithm = RslRlDistillationAlgorithmCfg(
         num_learning_epochs=2,
         learning_rate=1.0e-3,
-        gradient_length=15,
+        gradient_length=5,
+    )
+
+
+@configclass
+class PPORunnerBoxDistillationMLPCfg(RslRlDistillationRunnerCfg):
+    """Distillation runner using StudentTeacherCNN with an MLP image encoder.
+
+    The student encodes the flattened ZED2 depth image through a small MLP,
+    concatenates with proprioceptive obs, then passes through the action MLP.
+    Uses ``exteroceptive_flat`` (shape: (B, H*W)) rather than the 4D camera group.
+    """
+
+    num_steps_per_env = 1
+    max_iterations = 300
+    save_interval = 50
+    experiment_name = "box_reward_trials"
+    obs_groups = {"policy": ["proprioceptive", "exteroceptive_flat"], "teacher": ["policy"]}
+    policy = RslRlDistillationStudentTeacherCNNCfg(
+        init_noise_std=0.1,
+        noise_std_type="scalar",
+        student_obs_normalization=False,
+        teacher_obs_normalization=False,
+        student_hidden_dims=[128, 128],
+        teacher_hidden_dims=[256, 128, 128],
+        activation="elu",
+        student_image_groups=["exteroceptive_flat"],
+        student_encoder_type="mlp",
+        student_encoder_hidden_dims=[512, 256],
+        student_encoder_output_dim=64,
+    )
+    algorithm = RslRlDistillationAlgorithmCfg(
+        num_learning_epochs=1,
+        learning_rate=1.0e-3,
+        gradient_length=1,
     )
