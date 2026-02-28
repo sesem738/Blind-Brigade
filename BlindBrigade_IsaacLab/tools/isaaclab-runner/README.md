@@ -17,7 +17,8 @@ or for playback:
 
 ```bash
 python scripts/rsl_rl/play.py --task BB-rosbot-box-PLAY-v0 --agent rsl_rl_cfg_entry_point \
-    --num_envs 1 --load_run 2026-02-26_01-54-24 --checkpoint model_1999.pt
+    --num_envs 1 --load_run 2026-02-26_01-54-24 \
+    --checkpoint /abs/path/to/logs/.../model_1999.pt
 ```
 
 Remembering argument names, task IDs, agent config keys, and checkpoint paths is error-prone and slow. This extension replaces all of that with dropdowns and a single click.
@@ -32,8 +33,9 @@ The extension is a **VS Code Webview View** — a sidebar panel that renders an 
 VS Code Extension Host (Node.js)          Webview (sandboxed browser)
 ────────────────────────────────          ───────────────────────────
  - reads the filesystem (logs/)    ←→     - renders the UI (HTML/CSS/JS)
- - builds and runs CLI commands            - sends user actions as messages
- - knows the repo root location            - receives data to populate dropdowns
+ - parses Python source files              - sends user actions as messages
+ - builds and runs CLI commands            - receives data to populate dropdowns
+ - knows the repo root location
 ```
 
 The webview cannot access the filesystem or run processes directly — that's why the two sides communicate through messages. The extension host does all I/O and the webview is purely UI.
@@ -46,6 +48,9 @@ VS Code loads extensions from `~/.vscode/extensions/`. Rather than maintaining a
 - The repo is the single source of truth
 - Edits take effect on VS Code reload with no reinstall
 - Git tracks only the real files, not the symlink
+
+**Why Python as the terminal shell?**
+The extension spawns Python directly as the terminal process (`shellPath: pythonExe`) rather than launching a bash shell and sending a command string. It means no shell initialisation, no `.bashrc`, and no conda init running mid-command. The absolute path to the conda env's Python binary is resolved from `~/miniconda3/envs/<env>/bin/python`, so no `conda activate` is ever needed. Ctrl+C still works because the terminal sends SIGINT directly to the Python process.
 
 ---
 
@@ -62,38 +67,52 @@ tools/isaaclab-runner/
 
 ### `extension.js` sections
 
-| Lines | Section | Purpose |
-|-------|---------|---------|
-| 10–47 | Data tables | `TASKS`, `TASK_AGENTS`, `EXPERIMENT_NAMES` — maps task IDs to valid agent configs and their default experiment folder names (sourced from the Python agent config classes) |
-| 51–93 | View provider + message router | Registers the webview and routes incoming messages from the HTML panel to the right handler |
-| 99–118 | `_getRepoRoot()` | Finds the repo by scanning workspace folders for `scripts/rsl_rl/train.py`. Handles the case where VS Code is opened at the parent `Repo/` directory |
-| 120–163 | `_scan*()` | Reads `logs/rsl_rl/` to populate experiment, run, and checkpoint dropdowns dynamically |
-| 165–218 | `_runCommand()` | Assembles the CLI argument list from the config object and runs it in a new VS Code terminal. For debug mode, prepends `python -m debugpy --listen 5678 --wait-for-client` |
-| 222–715 | `_buildHtml()` | The entire panel UI as a template string — HTML structure, CSS using VS Code theme variables, and the JS event handlers |
+| Section | Purpose |
+|---------|---------|
+| `_parseTasksFromRepo()` | Scans `source/**/tasks/**/__init__.py` for `gym.register()` calls and extracts task IDs and agent entry point keys automatically |
+| `_parseInitFile()` / `_parseRegisterBlock()` | Regex parsers that read `gym.register()` blocks and extract task ID, agent config keys, and entry point module/class references |
+| `_parseExperimentName()` | Reads the `experiment_name = "..."` field from the agent config Python class body |
+| `_scanExperiments/Runs/Checkpoints()` | Reads `logs/rsl_rl/` to populate experiment, run, and checkpoint dropdowns; run scan also reads `run_label.txt` to show human-readable labels alongside timestamps |
+| `_setRunLabel()` | Writes or deletes `run_label.txt` in a run directory |
+| `_scanCondaEnvs()` | Lists available conda environments from `~/miniconda3/envs/` to populate the Python environment dropdown |
+| `_resolveCondaPython()` | Finds the absolute path to the Python binary for a conda environment without running `conda activate` |
+| `_runCommand()` | Assembles the args array and creates a terminal with Python as the shell process |
+| `resolveWebviewView()` | Sets up the webview, pushes initial data, and registers a file watcher on task and agent config files to auto-refresh on save |
+| `_buildHtml()` | The entire panel UI as a template string — HTML structure, CSS using VS Code theme variables, and the JS event handlers |
+
+---
+
+## Auto-Detection
+
+Tasks, agent configs, and experiment names are parsed live from the Python source files. No hardcoded tables.
+
+- **Tasks**: discovered from `gym.register(id=...)` calls in `source/**/tasks/**/__init__.py`
+- **Agent configs**: discovered from `rsl_rl_*_entry_point` keys in the same register blocks
+- **Experiment names**: read from `experiment_name = "..."` in the agent config class body
+- **Auto-refresh**: a file watcher on `source/**/tasks/**/{__init__.py,agents/*.py}` re-parses on every save, so the dropdowns update immediately when you add or rename a config
+
+---
+
+## Run Labelling
+
+Training runs are saved as timestamped directories (e.g. `2026-02-27_09-07-42`). The extension supports attaching a human-readable label to any run:
+
+- Select an experiment and run in the Play panel
+- Type a label in the text field and click **Save**
+- The label is written to `run_label.txt` inside the run directory
+- Future scans show the label alongside the timestamp in the dropdown
+
+Labels are stored as plain text files inside `logs/` which is gitignored, so they are local to each machine.
+
+---
+
+## Checkpoint Paths
+
+Isaac Lab's `retrieve_file_path()` requires an **absolute path** to the checkpoint file. The extension constructs the full path from the known repo root, experiment name, run folder, and checkpoint filename before passing it to `--checkpoint`. Passing just a filename like `model_1999.pt` causes a `FileNotFoundError`.
 
 ---
 
 ## Maintenance
-
-### Adding a new task
-
-1. Add an entry to `TASKS` in `extension.js`:
-   ```js
-   { id: 'BB-rosbot-newenv-v0', label: 'Rosbot – New Env' },
-   ```
-2. Add its valid agent configs to `TASK_AGENTS`:
-   ```js
-   'BB-rosbot-newenv-v0': ['rsl_rl_cfg_entry_point'],
-   ```
-3. Add its default experiment name to `EXPERIMENT_NAMES`:
-   ```js
-   'BB-rosbot-newenv-v0_rsl_rl_cfg_entry_point': 'rosbot_newenv',
-   ```
-4. Reload VS Code (`Ctrl+Shift+P` → `Developer: Reload Window`).
-
-### Adding a new agent config
-
-Add it to the relevant task's array in `TASK_AGENTS` and add the corresponding `EXPERIMENT_NAMES` entry using the key pattern `{task_id}_{agent_entry_point}`.
 
 ### Changing the UI
 
@@ -122,10 +141,20 @@ Safe to re-run — it skips steps that are already done.
 
 ## Debug Mode
 
-Clicking **🐛 Debug** runs the script with `debugpy` listening on port 5678. To attach:
+> **Known issue:** Debug mode does not currently work. The process launches and waits, but attaching the VS Code debugger does not connect successfully. Left here for future fixing.
 
-1. Open the Run & Debug panel (`Ctrl+Shift+D`)
-2. Select **"Isaac Lab: Attach Debugger"** from the dropdown
-3. Press F5
+Clicking **🐛 Debug** runs the script with `debugpy` listening on port 5678 and waiting for a client before starting execution.
 
-This config is defined in `.vscode/launch.json` in the repo root.
+**Prerequisites:**
+- `debugpy` must be installed in the selected conda environment:
+  ```bash
+  pip install debugpy
+  ```
+
+**To attach:**
+1. Click **🐛 Debug** — the terminal opens and freezes waiting for a client
+2. Open the Run & Debug panel (`Ctrl+Shift+D`)
+3. Select **"Isaac Lab: Attach Debugger"** from the dropdown
+4. Press **F5**
+
+The attach config is defined in `.vscode/launch.json` at the repo root.
