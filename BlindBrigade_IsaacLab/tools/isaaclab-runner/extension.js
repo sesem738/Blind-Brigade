@@ -63,6 +63,10 @@ class IsaacLabRunnerViewProvider {
                 this._scanCheckpoints(msg.experimentName, msg.run, msg.target);
                 break;
 
+            case 'setRunLabel':
+                this._setRunLabel(msg.experimentName, msg.run, msg.label);
+                break;
+
             case 'scanCondaEnvs':
                 this._scanCondaEnvs();
                 break;
@@ -96,6 +100,19 @@ class IsaacLabRunnerViewProvider {
         } catch (_) {
             this._send({ type: 'condaEnvs', envs: [] });
         }
+    }
+
+    _resolveCondaPython(condaEnv) {
+        if (!condaEnv) return 'python';
+        const home = require('os').homedir();
+        const condaRoot = ['miniconda3', 'anaconda3', 'mambaforge', 'miniforge3']
+            .map(d => path.join(home, d))
+            .find(d => fs.existsSync(d));
+        if (!condaRoot) return 'python';
+        const exe = condaEnv === 'base'
+            ? path.join(condaRoot, 'bin', 'python')
+            : path.join(condaRoot, 'envs', condaEnv, 'bin', 'python');
+        return fs.existsSync(exe) ? exe : 'python';
     }
 
     // ── Task parsing ──────────────────────────────────────────────────────────
@@ -251,10 +268,32 @@ class IsaacLabRunnerViewProvider {
         try {
             const runs = fs.readdirSync(expDir)
                 .filter(f => fs.statSync(path.join(expDir, f)).isDirectory())
-                .sort().reverse();   // newest first
+                .sort().reverse()   // newest first
+                .map(name => {
+                    const labelFile = path.join(expDir, name, 'run_label.txt');
+                    let label = '';
+                    try { label = fs.readFileSync(labelFile, 'utf8').trim(); } catch (_) {}
+                    return { name, label };
+                });
             this._send({ type: 'runs', runs, target });
         } catch (_) {
             this._send({ type: 'runs', runs: [], target });
+        }
+    }
+
+    _setRunLabel(experimentName, run, label) {
+        const root = this._getRepoRoot();
+        if (!root || !experimentName || !run) return;
+        const labelFile = path.join(root, 'logs', 'rsl_rl', experimentName, run, 'run_label.txt');
+        try {
+            if (label) {
+                fs.writeFileSync(labelFile, label.trim(), 'utf8');
+            } else {
+                if (fs.existsSync(labelFile)) fs.unlinkSync(labelFile);
+            }
+            this._send({ type: 'labelSaved' });
+        } catch (e) {
+            vscode.window.showErrorMessage(`Isaac Lab Runner: Could not save label — ${e.message}`);
         }
     }
 
@@ -279,8 +318,9 @@ class IsaacLabRunnerViewProvider {
         const root = this._getRepoRoot();
         if (!root) { vscode.window.showErrorMessage('Isaac Lab Runner: Could not find repo root (scripts/rsl_rl/train.py not found in any workspace folder).'); return; }
 
-        const scriptDir = path.join(root, 'scripts', 'rsl_rl');
-        const script = cfg.mode === 'train' ? 'train.py' : 'play.py';
+        const script = cfg.mode === 'train'
+            ? path.join(root, 'scripts', 'rsl_rl', 'train.py')
+            : path.join(root, 'scripts', 'rsl_rl', 'play.py');
 
         // Build arg list
         const actualTask = cfg.mode === 'play'
@@ -303,21 +343,32 @@ class IsaacLabRunnerViewProvider {
             }
         } else {
             if (cfg.loadRun)    args.push('--load_run', cfg.loadRun);
-            if (cfg.checkpoint) args.push('--checkpoint', cfg.checkpoint);
+            if (cfg.checkpoint) {
+                // Isaac Lab's retrieve_file_path() requires an absolute path — passing just the
+                // filename causes FileNotFoundError. Build the full path from what we know.
+                const fullCkpt = path.join(root, 'logs', 'rsl_rl', cfg.playExpName, cfg.loadRun, cfg.checkpoint);
+                args.push('--checkpoint', fullCkpt);
+            }
         }
 
-        if (cfg.extraArgs) args.push(cfg.extraArgs);
+        if (cfg.extraArgs) args.push(...cfg.extraArgs.split(/\s+/).filter(Boolean));
 
-        const pythonPart = cfg.debug
-            ? 'python -m debugpy --listen 5678 --wait-for-client'
-            : 'python';
+        // Use Python itself as the terminal shell process — same approach as the VS Code Python
+        // debugger. Python is spawned directly (no bash, no .bashrc, no conda init) so nothing
+        // can send stray characters before or during the run. Ctrl+C still works because the
+        // terminal sends SIGINT directly to the Python process.
+        const pythonExe = this._resolveCondaPython(cfg.condaEnv);
+        const shellArgs = cfg.debug
+            ? ['-m', 'debugpy', '--listen', '5678', '--wait-for-client', script, ...args]
+            : [script, ...args];
 
-        const condaPrefix = cfg.condaEnv ? `conda activate ${cfg.condaEnv} && ` : '';
-        const cmd = `${condaPrefix}${pythonPart} ${script} ${args.join(' ')}`;
-
-        const terminal = vscode.window.createTerminal({ name: `IsaacLab ${cfg.mode}`, cwd: scriptDir });
+        const terminal = vscode.window.createTerminal({
+            name: `IsaacLab ${cfg.mode}`,
+            cwd: root,
+            shellPath: pythonExe,
+            shellArgs,
+        });
         terminal.show();
-        terminal.sendText(cmd);
 
         if (cfg.debug) {
             vscode.window.showInformationMessage(
@@ -547,8 +598,8 @@ class IsaacLabRunnerViewProvider {
   <input type="text" id="experimentName" placeholder="auto (from agent cfg)" oninput="updatePreview()">
   <div class="row2">
     <div class="field">
-      <label>Run Name Suffix</label>
-      <input type="text" id="runName" placeholder="optional" oninput="updatePreview()">
+      <label>Run Tag <span style="font-weight:400;opacity:0.7">(appended to folder name)</span></label>
+      <input type="text" id="runName" placeholder="e.g. baseline, cnn_attempt_2" oninput="updatePreview()">
     </div>
     <div class="field">
       <label>Max Iterations</label>
@@ -596,6 +647,10 @@ class IsaacLabRunnerViewProvider {
     <select id="loadRun" onchange="onLoadRunChange()">
       <option value="">-- select experiment --</option>
     </select>
+  </div>
+  <div class="scan-row" style="margin-top:4px">
+    <input type="text" id="runLabelInput" placeholder="Label this run…" style="margin-bottom:0">
+    <button class="scan-btn" onclick="saveRunLabel()">Save</button>
   </div>
   <label style="margin-top:4px">Checkpoint</label>
   <select id="checkpoint" onchange="updatePreview()">
@@ -671,7 +726,19 @@ function onLoadRunChange() {
     const exp = document.getElementById('playExp').value;
     const run = document.getElementById('loadRun').value;
     if (exp && run) vscode.postMessage({ type: 'scanCheckpoints', experimentName: exp, run, target: 'play' });
+    // Populate label input with existing label for selected run
+    const sel = document.getElementById('loadRun');
+    const opt = sel.options[sel.selectedIndex];
+    document.getElementById('runLabelInput').value = opt ? (opt.dataset.label || '') : '';
     updatePreview();
+}
+
+function saveRunLabel() {
+    const exp  = document.getElementById('playExp').value;
+    const run  = document.getElementById('loadRun').value;
+    const label = document.getElementById('runLabelInput').value.trim();
+    if (!exp || !run) return;
+    vscode.postMessage({ type: 'setRunLabel', experimentName: exp, run, label });
 }
 
 function onResumeExpChange() {
@@ -708,7 +775,7 @@ function buildCmd(debug) {
     const condaEnv  = document.getElementById('condaEnv').value;
 
     const actualTask = mode === 'play' ? task.replace('-v0', '-PLAY-v0') : task;
-    const script     = mode === 'train' ? 'train.py' : 'play.py';
+    const script     = mode === 'train' ? 'scripts/rsl_rl/train.py' : 'scripts/rsl_rl/play.py';
 
     const a = ['--task', actualTask, '--agent', agent];
     if (ne)   a.push('--num_envs', ne);
@@ -741,8 +808,8 @@ function buildCmd(debug) {
         ? 'python -m debugpy --listen 5678 --wait-for-client'
         : 'python';
 
-    const condaPrefix = condaEnv ? \`conda activate \${condaEnv} && \` : '';
-    return condaPrefix + py + ' ' + script + ' ' + a.join(' ');
+    const envLabel = condaEnv ? \`# env: \${condaEnv}\n\` : '';
+    return envLabel + py + ' ' + script + ' ' + a.join(' ');
 }
 
 function updatePreview() {
@@ -772,8 +839,9 @@ function doRun(debug) {
         cfg.resumeRun      = document.getElementById('resumeRun').value;
         cfg.resumeCheckpoint = document.getElementById('resumeCheckpoint').value;
     } else {
-        cfg.loadRun    = document.getElementById('loadRun').value;
-        cfg.checkpoint = document.getElementById('checkpoint').value;
+        cfg.playExpName = document.getElementById('playExp').value;
+        cfg.loadRun     = document.getElementById('loadRun').value;
+        cfg.checkpoint  = document.getElementById('checkpoint').value;
     }
 
     vscode.postMessage({ type: 'run', config: cfg });
@@ -816,14 +884,27 @@ window.addEventListener('message', event => {
             }
             break;
 
-        case 'runs':
+        case 'runs': {
+            // runs is now [{name, label}] — build options with label shown if present
+            const buildRunOptions = runs => runs.map(r => {
+                const display = r.label ? \`\${r.label}  ·  \${r.name}\` : r.name;
+                return \`<option value="\${r.name}" data-label="\${r.label || ''}">\${display}</option>\`;
+            }).join('');
             if (msg.target === 'play') {
-                populateSelect('loadRun', msg.runs, '-- no runs found --');
+                const sel = document.getElementById('loadRun');
+                sel.innerHTML = msg.runs.length ? buildRunOptions(msg.runs) : '<option value="">-- no runs found --</option>';
                 if (msg.runs.length > 0) onLoadRunChange();
             } else {
-                populateSelect('resumeRun', msg.runs, '-- no runs found --');
+                // Resume uses plain names (no label UI there)
+                populateSelect('resumeRun', msg.runs.map(r => r.name), '-- no runs found --');
                 if (msg.runs.length > 0) onResumeRunChange();
             }
+            break;
+        }
+
+        case 'labelSaved':
+            // Re-scan runs to reflect the updated label in the dropdown
+            onPlayExpChange();
             break;
 
         case 'checkpoints':
