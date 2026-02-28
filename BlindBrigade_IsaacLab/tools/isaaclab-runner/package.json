@@ -1,0 +1,37 @@
+{
+  "name": "isaaclab-runner",
+  "displayName": "Isaac Lab Runner",
+  "description": "Sidebar panel to run Isaac Lab train/play sessions with dropdown selections",
+  "version": "1.0.0",
+  "publisher": "blindbrigade",
+  "engines": { "vscode": "^1.80.0" },
+  "categories": ["Other"],
+  "activationEvents": [],
+  "main": "./extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "isaaclab-runner-container",
+          "title": "Isaac Lab Runner",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "isaaclab-runner-container": [
+        {
+          "type": "webview",
+          "id": "isaacLabRunner",
+          "name": "Runner"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "isaacLabRunner.refresh",
+        "title": "Isaac Lab Runner: Refresh Panel"
+      }
+    ]
+  }
+}
