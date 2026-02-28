@@ -5,46 +5,8 @@ const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
 
-// ── Environment / Agent definitions ────────────────────────────────────────────
-
-const TASKS = [
-    { id: 'BB-rosbot-flat-v0',      label: 'Rosbot – Flat' },
-    { id: 'BB-rosbot-box-v0',       label: 'Rosbot – Box' },
-    { id: 'BB-rosbot-maze-v0',      label: 'Rosbot – Maze' },
-    { id: 'BB-rosbot-coop-flat-v0', label: 'Rosbot Coop – Flat' },
-    { id: 'BB-rosbot-coop-box-v0',  label: 'Rosbot Coop – Box' },
-];
-
-const TASK_AGENTS = {
-    'BB-rosbot-flat-v0':      ['rsl_rl_cfg_entry_point'],
-    'BB-rosbot-box-v0':       [
-        'rsl_rl_cfg_entry_point',
-        'rsl_rl_distil_cfg_entry_point',
-        'rsl_rl_distil_cnn_cfg_entry_point',
-        'rsl_rl_distil_mlp_cfg_entry_point',
-        'rsl_rl_gru_cfg_entry_point',
-        'rsl_rl_cnn_cfg_entry_point',
-        'rsl_rl_recurrent_cnn_cfg_entry_point',
-    ],
-    'BB-rosbot-maze-v0':      ['rsl_rl_cfg_entry_point'],
-    'BB-rosbot-coop-flat-v0': ['rsl_rl_cfg_entry_point'],
-    'BB-rosbot-coop-box-v0':  ['rsl_rl_cfg_entry_point'],
-};
-
-// Default experiment_name as defined in the Python agent config classes
-const EXPERIMENT_NAMES = {
-    'BB-rosbot-flat-v0_rsl_rl_cfg_entry_point':                   'rosbot_flat',
-    'BB-rosbot-box-v0_rsl_rl_cfg_entry_point':                    'box_reward_trials',
-    'BB-rosbot-box-v0_rsl_rl_distil_cfg_entry_point':             'box_reward_trials',
-    'BB-rosbot-box-v0_rsl_rl_distil_cnn_cfg_entry_point':         'box_reward_trials',
-    'BB-rosbot-box-v0_rsl_rl_distil_mlp_cfg_entry_point':         'box_reward_trials',
-    'BB-rosbot-box-v0_rsl_rl_gru_cfg_entry_point':                'rosbot_heightscan_gru_mlp',
-    'BB-rosbot-box-v0_rsl_rl_cnn_cfg_entry_point':                'rosbot_cnn_mlp',
-    'BB-rosbot-box-v0_rsl_rl_recurrent_cnn_cfg_entry_point':      'rosbot_recurrent_cnn',
-    'BB-rosbot-maze-v0_rsl_rl_cfg_entry_point':                   'rosbot_maze',
-    'BB-rosbot-coop-flat-v0_rsl_rl_cfg_entry_point':              'rosbot_coop_flat',
-    'BB-rosbot-coop-box-v0_rsl_rl_cfg_entry_point':               'rosbot_coop_box',
-};
+// Tasks, agent configs, and experiment names are parsed dynamically from the repo.
+// See _parseTasksFromRepo() below — no hardcoded tables needed.
 
 // ── Webview provider ───────────────────────────────────────────────────────────
 
@@ -52,28 +14,43 @@ class IsaacLabRunnerViewProvider {
     constructor(context) {
         this._context = context;
         this._view = null;
+        this._watcher = null;
+        this._taskData = null;
     }
 
     resolveWebviewView(webviewView) {
         this._view = webviewView;
         webviewView.webview.options = { enableScripts: true };
         webviewView.webview.html = this._buildHtml(webviewView.webview);
-
         webviewView.webview.onDidReceiveMessage(msg => this._handleMessage(msg));
+
+        // Push task data immediately when the panel opens
+        this._refreshAndPush();
+
+        // Watch task __init__.py and agent config files; re-parse on save
+        if (!this._watcher) {
+            const root = this._getRepoRoot();
+            if (root) {
+                const pattern = new vscode.RelativePattern(root,
+                    'source/**/tasks/**/{__init__.py,agents/*.py}');
+                this._watcher = vscode.workspace.createFileSystemWatcher(pattern);
+                const refresh = () => this._refreshAndPush();
+                this._watcher.onDidChange(refresh);
+                this._watcher.onDidCreate(refresh);
+                this._watcher.onDidDelete(refresh);
+                this._context.subscriptions.push(this._watcher);
+            }
+        }
+    }
+
+    _refreshAndPush() {
+        const data = this._parseTasksFromRepo();
+        this._taskData = data;
+        this._send({ type: 'tasks', ...data });
     }
 
     _handleMessage(msg) {
         switch (msg.type) {
-            case 'getAgents':
-                this._send({ type: 'agents', agents: TASK_AGENTS[msg.task] || ['rsl_rl_cfg_entry_point'] });
-                break;
-
-            case 'getExperimentName': {
-                const key = `${msg.task}_${msg.agent}`;
-                this._send({ type: 'experimentName', name: EXPERIMENT_NAMES[key] || '' });
-                break;
-            }
-
             case 'scanExperiments':
                 this._scanExperiments(msg.target);
                 break;
@@ -86,6 +63,10 @@ class IsaacLabRunnerViewProvider {
                 this._scanCheckpoints(msg.experimentName, msg.run, msg.target);
                 break;
 
+            case 'scanCondaEnvs':
+                this._scanCondaEnvs();
+                break;
+
             case 'run':
                 this._runCommand(msg.config);
                 break;
@@ -94,6 +75,138 @@ class IsaacLabRunnerViewProvider {
 
     _send(data) {
         if (this._view) this._view.webview.postMessage(data);
+    }
+
+    _scanCondaEnvs() {
+        const home = require('os').homedir();
+        // Check common conda install locations
+        const roots = ['miniconda3', 'anaconda3', 'mambaforge', 'miniforge3']
+            .map(d => path.join(home, d))
+            .filter(d => fs.existsSync(d));
+
+        if (roots.length === 0) { this._send({ type: 'condaEnvs', envs: [] }); return; }
+
+        const condaRoot = roots[0];
+        const envsDir = path.join(condaRoot, 'envs');
+        try {
+            const envs = ['base', ...fs.readdirSync(envsDir)
+                .filter(f => fs.statSync(path.join(envsDir, f)).isDirectory())
+                .sort()];
+            this._send({ type: 'condaEnvs', envs });
+        } catch (_) {
+            this._send({ type: 'condaEnvs', envs: [] });
+        }
+    }
+
+    // ── Task parsing ──────────────────────────────────────────────────────────
+
+    _parseTasksFromRepo() {
+        const root = this._getRepoRoot();
+        const empty = { tasks: [], agentMap: {}, expNameMap: {} };
+        if (!root) return empty;
+
+        const tasksDir = path.join(root, 'source', 'BlindBrigade_tasks', 'BlindBrigade_tasks', 'tasks');
+        if (!fs.existsSync(tasksDir)) return empty;
+
+        const tasks = [], agentMap = {}, expNameMap = {};
+
+        try {
+            const taskDirs = fs.readdirSync(tasksDir)
+                .filter(f => fs.statSync(path.join(tasksDir, f)).isDirectory());
+
+            for (const dir of taskDirs) {
+                const initFile = path.join(tasksDir, dir, '__init__.py');
+                if (!fs.existsSync(initFile)) continue;
+
+                const parsed = this._parseInitFile(fs.readFileSync(initFile, 'utf8'));
+
+                for (const reg of parsed) {
+                    if (reg.id.includes('-PLAY-')) continue;   // skip play variants
+
+                    tasks.push({ id: reg.id, label: this._makeLabel(reg.id) });
+                    agentMap[reg.id] = reg.agentKeys;
+
+                    // Resolve experiment_name for each entry point from the agent config files
+                    for (const { key, module, className } of reg.entryPoints) {
+                        const agentFile = path.join(tasksDir, dir, 'agents', `${module}.py`);
+                        if (fs.existsSync(agentFile)) {
+                            const expName = this._parseExperimentName(agentFile, className);
+                            if (expName) expNameMap[`${reg.id}_${key}`] = expName;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Isaac Lab Runner: parse error', e);
+        }
+
+        return { tasks, agentMap, expNameMap };
+    }
+
+    // Parse a single __init__.py and return one object per gym.register() call
+    _parseInitFile(content) {
+        const results = [];
+        const lines = content.split('\n');
+        let inBlock = false, blockLines = [];
+
+        for (const line of lines) {
+            if (line.trimStart().startsWith('gym.register(')) {
+                inBlock = true;
+                blockLines = [line];
+            } else if (inBlock) {
+                blockLines.push(line);
+                if (line.trim() === ')') {
+                    const parsed = this._parseRegisterBlock(blockLines.join('\n'));
+                    if (parsed) results.push(parsed);
+                    inBlock = false;
+                    blockLines = [];
+                }
+            }
+        }
+        return results;
+    }
+
+    _parseRegisterBlock(block) {
+        const idMatch = block.match(/id\s*=\s*["']([^"']+)["']/);
+        if (!idMatch) return null;
+
+        const agentKeys = [], entryPoints = [];
+
+        for (const line of block.split('\n')) {
+            // Match lines like: "rsl_rl_cfg_entry_point": f"...module:ClassName"
+            const keyMatch = line.match(/"(rsl_rl[^"]*_entry_point)"\s*:/);
+            if (!keyMatch) continue;
+
+            const key = keyMatch[1];
+            agentKeys.push(key);
+
+            // Extract module and ClassName from the f-string value: .module_name:ClassName
+            const mcMatch = line.match(/\.([\w_]+):([\w]+)/);
+            if (mcMatch) entryPoints.push({ key, module: mcMatch[1], className: mcMatch[2] });
+        }
+
+        return { id: idMatch[1], agentKeys, entryPoints };
+    }
+
+    // Find experiment_name = "..." for a given class in a Python file
+    _parseExperimentName(filePath, className) {
+        try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            const classStart = content.indexOf(`class ${className}`);
+            if (classStart === -1) return null;
+            const nextClass = content.indexOf('\nclass ', classStart + 1);
+            const body = nextClass === -1 ? content.slice(classStart) : content.slice(classStart, nextClass);
+            const m = body.match(/experiment_name\s*=\s*["']([^"']+)["']/);
+            return m ? m[1] : null;
+        } catch (_) { return null; }
+    }
+
+    _makeLabel(taskId) {
+        // "BB-rosbot-coop-box-v0" → "Rosbot Coop – Box"
+        const parts = taskId.replace(/^BB-rosbot-/, '').replace(/-v\d+$/, '')
+            .split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1));
+        if (parts.length === 1) return `Rosbot – ${parts[0]}`;
+        return `Rosbot ${parts.slice(0, -1).join(' ')} – ${parts[parts.length - 1]}`;
     }
 
     // Find the workspace folder that contains scripts/rsl_rl/train.py
@@ -199,7 +312,8 @@ class IsaacLabRunnerViewProvider {
             ? 'python -m debugpy --listen 5678 --wait-for-client'
             : 'python';
 
-        const cmd = `${pythonPart} ${script} ${args.join(' ')}`;
+        const condaPrefix = cfg.condaEnv ? `conda activate ${cfg.condaEnv} && ` : '';
+        const cmd = `${condaPrefix}${pythonPart} ${script} ${args.join(' ')}`;
 
         const terminal = vscode.window.createTerminal({ name: `IsaacLab ${cfg.mode}`, cwd: scriptDir });
         terminal.show();
@@ -220,15 +334,6 @@ class IsaacLabRunnerViewProvider {
     // ── HTML ─────────────────────────────────────────────────────────────────
 
     _buildHtml(webview) {
-        const taskOptions = TASKS.map(t =>
-            `<option value="${t.id}">${t.label}</option>`
-        ).join('\n');
-
-        const initialAgents = TASK_AGENTS[TASKS[0].id];
-        const agentOptions = initialAgents.map(a =>
-            `<option value="${a}">${a}</option>`
-        ).join('\n');
-
         return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -396,13 +501,28 @@ class IsaacLabRunnerViewProvider {
   </div>
 </div>
 
+<!-- ── Conda Env ── -->
+<div class="section">
+  <div class="section-title">Python Environment</div>
+  <div class="scan-row">
+    <select id="condaEnv" onchange="updatePreview()">
+      <option value="">-- scan first --</option>
+    </select>
+    <button class="scan-btn" onclick="vscode.postMessage({type:'scanCondaEnvs'})">Scan</button>
+  </div>
+</div>
+
 <!-- ── Environment ── -->
 <div class="section">
   <div class="section-title">Environment</div>
   <label>Task</label>
-  <select id="task" onchange="onTaskChange()">${taskOptions}</select>
+  <select id="task" onchange="onTaskChange()">
+    <option value="">-- loading... --</option>
+  </select>
   <label>Agent Config</label>
-  <select id="agent" onchange="onAgentChange()">${agentOptions}</select>
+  <select id="agent" onchange="onAgentChange()">
+    <option value="">-- select task first --</option>
+  </select>
 </div>
 
 <!-- ── Parameters ── -->
@@ -501,6 +621,7 @@ class IsaacLabRunnerViewProvider {
 <script>
 const vscode = acquireVsCodeApi();
 let mode = 'train';
+let taskData = { tasks: [], agentMap: {}, expNameMap: {} };
 
 // ── Mode ────────────────────────────────────────────────────────────────────
 function setMode(m) {
@@ -521,13 +642,16 @@ function setMode(m) {
 // ── Task / Agent ─────────────────────────────────────────────────────────────
 function onTaskChange() {
     const task = document.getElementById('task').value;
-    vscode.postMessage({ type: 'getAgents', task });
+    const agents = taskData.agentMap[task] || [];
+    populateSelect('agent', agents, '-- none --');
+    onAgentChange();
 }
 
 function onAgentChange() {
     const task  = document.getElementById('task').value;
     const agent = document.getElementById('agent').value;
-    vscode.postMessage({ type: 'getExperimentName', task, agent });
+    const expName = taskData.expNameMap[\`\${task}_\${agent}\`] || '';
+    if (expName) document.getElementById('experimentName').value = expName;
     updatePreview();
 }
 
@@ -576,11 +700,12 @@ function toggleResume() {
 
 // ── Command builder ──────────────────────────────────────────────────────────
 function buildCmd(debug) {
-    const task  = document.getElementById('task').value;
-    const agent = document.getElementById('agent').value;
-    const ne    = document.getElementById('numEnvs').value;
-    const seed  = document.getElementById('seed').value;
-    const extra = document.getElementById('extraArgs').value.trim();
+    const task      = document.getElementById('task').value;
+    const agent     = document.getElementById('agent').value;
+    const ne        = document.getElementById('numEnvs').value;
+    const seed      = document.getElementById('seed').value;
+    const extra     = document.getElementById('extraArgs').value.trim();
+    const condaEnv  = document.getElementById('condaEnv').value;
 
     const actualTask = mode === 'play' ? task.replace('-v0', '-PLAY-v0') : task;
     const script     = mode === 'train' ? 'train.py' : 'play.py';
@@ -616,7 +741,8 @@ function buildCmd(debug) {
         ? 'python -m debugpy --listen 5678 --wait-for-client'
         : 'python';
 
-    return py + ' ' + script + ' ' + a.join(' ');
+    const condaPrefix = condaEnv ? \`conda activate \${condaEnv} && \` : '';
+    return condaPrefix + py + ' ' + script + ' ' + a.join(' ');
 }
 
 function updatePreview() {
@@ -631,6 +757,7 @@ function doRun(debug) {
         mode,
         task,
         agent,
+        condaEnv:   document.getElementById('condaEnv').value,
         numEnvs:    document.getElementById('numEnvs').value,
         seed:       document.getElementById('seed').value,
         extraArgs:  document.getElementById('extraArgs').value.trim(),
@@ -666,15 +793,18 @@ function populateSelect(id, items, emptyLabel) {
 window.addEventListener('message', event => {
     const msg = event.data;
     switch (msg.type) {
-        case 'agents':
-            populateSelect('agent', msg.agents, '-- none --');
-            onAgentChange();
+        case 'tasks': {
+            taskData = { tasks: msg.tasks, agentMap: msg.agentMap, expNameMap: msg.expNameMap };
+            const sel = document.getElementById('task');
+            const prev = sel.value;
+            sel.innerHTML = msg.tasks.length
+                ? msg.tasks.map(t => \`<option value="\${t.id}">\${t.label} (\${t.id})</option>\`).join('')
+                : '<option value="">-- no tasks found --</option>';
+            // Restore previous selection if still valid, otherwise trigger fresh update
+            if (prev && msg.tasks.some(t => t.id === prev)) sel.value = prev;
+            onTaskChange();
             break;
-
-        case 'experimentName':
-            if (msg.name) document.getElementById('experimentName').value = msg.name;
-            updatePreview();
-            break;
+        }
 
         case 'experiments':
             if (msg.target === 'play') {
@@ -703,12 +833,26 @@ window.addEventListener('message', event => {
                 populateSelect('resumeCheckpoint', msg.checkpoints, '-- no checkpoints --');
             }
             break;
+
+        case 'condaEnvs': {
+            const sel = document.getElementById('condaEnv');
+            if (msg.envs.length === 0) {
+                sel.innerHTML = '<option value="">-- none found --</option>';
+            } else {
+                sel.innerHTML = msg.envs.map(e => \`<option value="\${e}">\${e}</option>\`).join('');
+                // Default to blindbrigade if present, otherwise first entry
+                const preferred = msg.envs.find(e => e === 'blindbrigade') || msg.envs[0];
+                sel.value = preferred;
+            }
+            updatePreview();
+            break;
+        }
     }
 });
 
-// Init
+// Init — conda envs and tasks are both pushed from the extension on open
+vscode.postMessage({ type: 'scanCondaEnvs' });
 updatePreview();
-onTaskChange();
 </script>
 </body>
 </html>`;
