@@ -95,6 +95,15 @@ class RosbotNavFlatTerrainEnvCfg(RosbotNavBoxTerrainEnvCfg):
 @configclass
 class RosbotNavFlatTerrainEnvPLAYCfg(RosbotNavFlatTerrainEnvCfg):
     """Play config for RosbotNavFlatTerrainEnvCfg."""
-
+    
     def __post_init__(self):
         super().__post_init__()
+
+        self.scene.terrain.terrain_generator.curriculum = False
+        self.scene.terrain.max_init_terrain_level = 1
+        self.scene.terrain.terrain_generator.num_rows = 1
+        self.scene.terrain.terrain_generator.num_cols = 6
+        self.scene.ray_caster_cam.debug_vis = True
+        self.scene.terrain.debug_vis = True
+        self.actions.base_twist.animate_wheels = True
+        self.curriculum = None

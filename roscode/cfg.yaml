@@ -1,0 +1,24 @@
+/motion_capture_tracking:
+  ros__parameters:
+    # Set the type to vicon
+    type: "vicon"
+    
+    # Specify the IP address of the Windows machine running Vicon Tracker/Nexus
+    hostname: "10.88.243.64" # Replace with your actual Vicon PC IP
+
+    topics:
+      # Changed to "world" to match the default Fixed Frame in your rviz.rviz file
+      frame_id: "world" 
+      poses:
+        qos:
+          mode: "none" 
+          deadline: 100.0
+      tf:
+        reference_frame: "world"
+        child_frame_fmt: "%s"
+
+    logfilepath: ''
+    
+    # Note: marker_configurations, dynamics_configurations, and rigid_bodies 
+    # are completely omitted below so Vicon's built-in tracking is used without 
+    # crashing the ROS 2 YAML parser.

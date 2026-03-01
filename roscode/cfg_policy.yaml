@@ -1,0 +1,53 @@
+# onnx_policy_node configuration
+# Pass with:  ros2 run <pkg> onnx_policy_node --ros-args --params-file cfg_policy.yaml
+
+onnx_policy_node:
+  ros__parameters:
+
+    # ── Policy ────────────────────────────────────────────────────────────────
+    # Absolute or relative path to the exported ONNX file.
+    onnx_path: "/path/to/policy.onnx"
+
+    # ── Robot identity ────────────────────────────────────────────────────────
+    # Must match the rigid-body name in Vicon Tracker / Nexus.
+    robot_name: "Bob"
+
+    # ── Goal (world frame, metres) ────────────────────────────────────────────
+    goal_x: 2.0
+    goal_y: 0.0
+
+    # ── Topics ────────────────────────────────────────────────────────────────
+    # Vicon NamedPoseArray topic (usually a single shared topic for all robots).
+    pose_topic: "poses"
+    # cmd_vel is relative — it will be prefixed by the node namespace automatically.
+    # e.g., launch with  --ros-args -r __ns:=/robot1  → /robot1/cmd_vel
+    cmd_vel_topic: "cmd_vel"
+
+    # ── Control rate ──────────────────────────────────────────────────────────
+    # Must match sim decimation: dt=1/120 s, decimation=3 → 40 Hz.
+    control_rate: 40.0
+
+    # ── Safety ────────────────────────────────────────────────────────────────
+    # Stop the robot if no Vicon message arrives within this window (seconds).
+    vicon_timeout_s: 0.5
+
+    # ── Action scaling (must match SE2BaseMecanumDriveCfg in training) ────────
+    max_vx: 1.0    # m/s
+    max_vy: 1.0    # m/s
+    max_wz: 2.0    # rad/s
+
+    # ── Hard velocity safety clip (applied after policy scaling) ─────────────
+    clip_vx: 0.8   # m/s  (slightly below max_vx for a safety margin)
+    clip_vy: 0.8   # m/s
+    clip_wz: 1.5   # rad/s
+
+    # ── Velocity estimator low-pass filter ────────────────────────────────────
+    # alpha ∈ (0, 1]: 1.0 = no filter (raw finite differences),
+    # lower values → smoother but laggier estimates.
+    # At 40 Hz, alpha ≈ 0.4 gives a ~5 Hz effective cut-off.
+    vel_lpf_alpha: 0.4
+
+    # ── Action output low-pass filter ─────────────────────────────────────────
+    # Must match action_lpf_alpha in SE2BaseMecanumDriveCfg.
+    # Default in training cfg is 1.0 (no filter).
+    action_lpf_alpha: 1.0
