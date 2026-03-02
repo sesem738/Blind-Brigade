@@ -5,7 +5,7 @@ height-scan observation.  No learning — purely reactive.  Useful as a
 sanity-check that the env loop, observations, and actions work end-to-end.
 
 Usage:
-    isaaclab -p scripts/potential_field_agent.py --task BB-rosbot-box-PLAY-v0 --num_envs 4
+    isaaclab -p scripts/agents/potential_field_agent.py --task BB-rosbot-box-PLAY-v0 --num_envs 4
 """
 
 import argparse
@@ -72,7 +72,7 @@ def compute_action(
     f_att = goal_dir * speed             # (B, 2)
 
     # ── repulsive force from obstacles ──────────────────────────────────
-    grid = hscan.reshape(B, GRID_N, GRID_N)
+    grid = hscan.reshape(B, GRID_N//2, GRID_N)
 
     # Anything above ~9 cm (normalised) is an obstacle
     is_obstacle = (grid > 0.03).float()

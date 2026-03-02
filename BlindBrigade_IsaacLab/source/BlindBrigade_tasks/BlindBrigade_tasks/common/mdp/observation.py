@@ -89,6 +89,9 @@ def camera_image(
     if img.dtype == torch.uint8:
         img = img.to(torch.float32) / 255.0
 
+    # Safeguard from inf's
+    img[img == float("inf")] = 0
+
     if flatten:
         return img.flatten(start_dim=1)
     else:

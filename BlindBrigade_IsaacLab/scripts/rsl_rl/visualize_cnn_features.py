@@ -3,7 +3,7 @@
 Hooks into the Conv2d layers of the student CNN encoder and saves feature map
 grids alongside the input depth image at each captured step.
 
-Usage (from scripts/rsl_rl/):
+Usage:
     python scripts/rsl_rl/visualize_cnn_features.py \
         --task BB-rosbot-box-PLAY-v0 \
         --agent rsl_rl_distil_cnn_cfg_entry_point \

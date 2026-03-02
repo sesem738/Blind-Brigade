@@ -74,6 +74,10 @@ class IsaacLabRunnerViewProvider {
             case 'run':
                 this._runCommand(msg.config);
                 break;
+
+            case 'openTensorboard':
+                this._openTensorboard(msg.condaEnv);
+                break;
         }
     }
 
@@ -331,6 +335,8 @@ class IsaacLabRunnerViewProvider {
 
         if (cfg.numEnvs)       args.push('--num_envs', cfg.numEnvs);
         if (cfg.seed)          args.push('--seed', cfg.seed);
+        if (cfg.headless)      args.push('--headless');
+        if (cfg.enableCameras) args.push('--enable_cameras');
 
         if (cfg.mode === 'train') {
             if (cfg.experimentName) args.push('--experiment_name', cfg.experimentName);
@@ -380,6 +386,31 @@ class IsaacLabRunnerViewProvider {
                 }
             });
         }
+    }
+
+    _openTensorboard(condaEnv) {
+        const root = this._getRepoRoot();
+        if (!root) {
+            vscode.window.showErrorMessage('Isaac Lab Runner: Could not find repo root.');
+            return;
+        }
+
+        const pythonExe = this._resolveCondaPython(condaEnv);
+        const terminal = vscode.window.createTerminal({
+            name: 'TensorBoard',
+            cwd: root,
+            shellPath: pythonExe,
+            shellArgs: ['-m', 'tensorboard', '--logdir', 'logs'],
+        });
+        terminal.show();
+
+        // Give TensorBoard a moment to start, then open in Simple Browser tab
+        setTimeout(() => {
+            vscode.commands.executeCommand(
+                'simpleBrowser.show',
+                vscode.Uri.parse('http://localhost:6006')
+            );
+        }, 3000);
     }
 
     // ── HTML ─────────────────────────────────────────────────────────────────
@@ -534,6 +565,11 @@ class IsaacLabRunnerViewProvider {
     color: var(--vscode-button-secondaryForeground);
     border: 1px solid var(--vscode-focusBorder, #007acc);
   }
+  .btn-tb {
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border: 1px solid var(--vscode-notificationsInfoIcon-foreground, #3794ff);
+  }
 
   .hidden { display: none !important; }
 
@@ -582,12 +618,20 @@ class IsaacLabRunnerViewProvider {
   <div class="row2">
     <div class="field">
       <label>Num Envs</label>
-      <input type="number" id="numEnvs" value="2048" min="1" oninput="updatePreview()">
+      <input type="number" id="numEnvs" value="8192" min="1" oninput="updatePreview()">
     </div>
     <div class="field">
       <label>Seed</label>
       <input type="number" id="seed" placeholder="random" oninput="updatePreview()">
     </div>
+  </div>
+  <div class="row2" style="margin-top:2px">
+    <label class="check-row" style="flex:1">
+      <input type="checkbox" id="headlessCheck" checked onchange="updatePreview()"> Headless
+    </label>
+    <label class="check-row" style="flex:1">
+      <input type="checkbox" id="enableCamerasCheck" onchange="updatePreview()"> Enable Cameras
+    </label>
   </div>
 </div>
 
@@ -673,6 +717,12 @@ class IsaacLabRunnerViewProvider {
   <button class="run-btn btn-debug" onclick="doRun(true)"> 🐛 Debug</button>
 </div>
 
+<hr>
+<div class="section-title">Tools</div>
+<div class="run-row">
+  <button class="run-btn btn-tb" onclick="openTensorboard()">📊 TensorBoard</button>
+</div>
+
 <script>
 const vscode = acquireVsCodeApi();
 let mode = 'train';
@@ -688,8 +738,11 @@ function setMode(m) {
 
     // Sensible num_envs default
     const ne = document.getElementById('numEnvs');
-    if (m === 'play' && ne.value === '2048') ne.value = '1';
-    else if (m === 'train' && ne.value === '1') ne.value = '2048';
+    if (m === 'play' && ne.value === '8192') ne.value = '8';
+    else if (m === 'train' && ne.value === '8') ne.value = '8192';
+
+    // Headless default: on for train, off for play
+    document.getElementById('headlessCheck').checked = (m === 'train');
 
     updatePreview();
 }
@@ -780,6 +833,8 @@ function buildCmd(debug) {
     const a = ['--task', actualTask, '--agent', agent];
     if (ne)   a.push('--num_envs', ne);
     if (seed) a.push('--seed', seed);
+    if (document.getElementById('headlessCheck').checked)        a.push('--headless');
+    if (document.getElementById('enableCamerasCheck').checked)   a.push('--enable_cameras');
 
     if (mode === 'train') {
         const expName = document.getElementById('experimentName').value.trim();
@@ -824,10 +879,12 @@ function doRun(debug) {
         mode,
         task,
         agent,
-        condaEnv:   document.getElementById('condaEnv').value,
-        numEnvs:    document.getElementById('numEnvs').value,
-        seed:       document.getElementById('seed').value,
-        extraArgs:  document.getElementById('extraArgs').value.trim(),
+        condaEnv:       document.getElementById('condaEnv').value,
+        numEnvs:        document.getElementById('numEnvs').value,
+        seed:           document.getElementById('seed').value,
+        headless:       document.getElementById('headlessCheck').checked,
+        enableCameras:  document.getElementById('enableCamerasCheck').checked,
+        extraArgs:      document.getElementById('extraArgs').value.trim(),
         debug,
     };
 
@@ -845,6 +902,12 @@ function doRun(debug) {
     }
 
     vscode.postMessage({ type: 'run', config: cfg });
+}
+
+// ── TensorBoard ──────────────────────────────────────────────────────────────
+function openTensorboard() {
+    const condaEnv = document.getElementById('condaEnv').value;
+    vscode.postMessage({ type: 'openTensorboard', condaEnv });
 }
 
 // ── Messages from extension ──────────────────────────────────────────────────

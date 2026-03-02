@@ -1,8 +1,8 @@
 """Script to teleoperate a robot in an Isaac Lab environment using keyboard.
 
 Usage:
-    python scripts/teleop_agent.py --task=BB-rosbot-coop-flat-v0 --num_envs=1
-    python scripts/teleop_agent.py --task=BB-rosbot-box-PLAY-v0 --num_envs=1
+    python scripts/agents/teleop_agent.py --task=BB-rosbot-coop-flat-v0 --num_envs=1
+    python scripts/agents/teleop_agent.py --task=BB-rosbot-box-PLAY-v0 --num_envs=1
 
 Controls:
     Arrow Up / Numpad 8   : Forward  (+vx)

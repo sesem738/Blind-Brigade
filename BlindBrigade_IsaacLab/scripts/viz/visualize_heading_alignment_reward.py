@@ -4,7 +4,7 @@ Shows how the penalty varies across velocity space for different
 max_speed and weight values to help tune the reward term.
 
 Usage:
-    python scripts/visualize_heading_alignment_reward.py
+    python scripts/viz/visualize_heading_alignment_reward.py
 """
 
 import numpy as np

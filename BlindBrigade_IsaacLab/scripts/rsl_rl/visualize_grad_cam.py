@@ -7,7 +7,7 @@ Grad-CAM reference:
     Selvaraju et al., "Grad-CAM: Visual Explanations from Deep Networks via
     Gradient-based Localization", ICCV 2017.
 
-Usage (from scripts/rsl_rl/):
+Usage:
     python scripts/rsl_rl/visualize_grad_cam.py \
         --task BB-rosbot-box-PLAY-v0 \
         --agent rsl_rl_distil_cnn_cfg_entry_point \

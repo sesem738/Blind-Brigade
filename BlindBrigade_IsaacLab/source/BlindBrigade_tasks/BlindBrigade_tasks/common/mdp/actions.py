@@ -58,9 +58,9 @@ class SE2BaseMecanumDrive(ActionTerm):
 
     def apply_actions(self):
         # Extract body-frame commands
-        vx = self._processed_actions[:, 0]
-        vy = self._processed_actions[:, 1]
-        wz = self._processed_actions[:, 2]
+        vx = self._processed_actions[:, 0] * self.cfg.scale_factor_vx
+        vy = self._processed_actions[:, 1] * self.cfg.scale_factor_vy
+        wz = self._processed_actions[:, 2] * self.cfg.scale_factor_wz
 
         if self.cfg.animate_wheels:
             # Compute wheel speeds from body velocities
@@ -149,7 +149,12 @@ class SE2BaseMecanumDriveCfg(ActionTermCfg):
     # Action limits (body frame)
     max_vx: float = 1.0
     max_vy: float = 1.0
-    max_wz: float = 2.0
+    max_wz: float = 10.0
+
+    # Acounting for model errors
+    scale_factor_vx: float = 1.0
+    scale_factor_vy: float = 1.0
+    scale_factor_wz: float = 1.5
 
     # Clamp wheel speeds (rad/s)
     max_wheel_speed: float = 60.0
