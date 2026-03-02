@@ -15,7 +15,7 @@ from isaaclab_rl.rsl_rl import (
 @configclass
 class PPORunnerBoxDistillationCfg(RslRlDistillationRunnerCfg):
     num_steps_per_env = 16
-    max_iterations = 300
+    max_iterations = 1000
     save_interval = 50
     experiment_name = "box_reward_trials"
     obs_groups = {"policy": ["policy"], "teacher": ["policy"]}
@@ -24,7 +24,7 @@ class PPORunnerBoxDistillationCfg(RslRlDistillationRunnerCfg):
         noise_std_type="scalar",
         student_obs_normalization=False,
         teacher_obs_normalization=False,
-        student_hidden_dims=[256, 128, 128],
+        student_hidden_dims=[512, 256, 128],
         teacher_hidden_dims=[256, 128, 128],
         activation="elu",
     )
@@ -102,7 +102,7 @@ class PPORunnerBoxDistillationMLPCfg(RslRlDistillationRunnerCfg):
     Uses ``exteroceptive_flat`` (shape: (B, H*W)) rather than the 4D camera group.
     """
 
-    num_steps_per_env = 1
+    num_steps_per_env = 16
     max_iterations = 300
     save_interval = 50
     experiment_name = "box_reward_trials"
@@ -123,5 +123,5 @@ class PPORunnerBoxDistillationMLPCfg(RslRlDistillationRunnerCfg):
     algorithm = RslRlDistillationAlgorithmCfg(
         num_learning_epochs=1,
         learning_rate=1.0e-3,
-        gradient_length=1,
+        gradient_length=5,
     )

@@ -89,6 +89,11 @@ class RosbotNavFlatTerrainEnvCfg(RosbotNavBoxTerrainEnvCfg):
             ),
         }
         self.terminations.terrain_contact = None
+        self.scene.zed2_camera = None
+        self.observations.policy = None
+        self.observations.critic = None
+        self.observations.exteroceptive = None
+        self.observations.exteroceptive_flat = None
         self.curriculum = None
 
 
@@ -106,4 +111,3 @@ class RosbotNavFlatTerrainEnvPLAYCfg(RosbotNavFlatTerrainEnvCfg):
         self.scene.ray_caster_cam.debug_vis = True
         self.scene.terrain.debug_vis = True
         self.actions.base_twist.animate_wheels = True
-        self.curriculum = None

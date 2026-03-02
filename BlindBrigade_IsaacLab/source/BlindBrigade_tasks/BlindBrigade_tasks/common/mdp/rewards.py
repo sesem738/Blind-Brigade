@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import torch
 from isaaclab.managers import SceneEntityCfg
+from isaaclab.envs.mdp import height_scan
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
@@ -230,6 +231,71 @@ def obstacle_approach_penalty(
 
     in_zone = (horiz_dist < danger_radius) & valid
     return (approach * obstacle_weight * in_zone.float()).sum(dim=1)
+
+
+def forward_clearance(
+    env: ManagerBasedRLEnv,
+    sensor_cfg: SceneEntityCfg = SceneEntityCfg("ray_caster_cam"),
+    cone_half_angle_deg: float = 30.0,
+) -> torch.Tensor:
+    """Reward for clear space in the robot's forward-facing cone.
+
+    Uses the height-scan rays within a forward cone. Large height-scan values
+    mean the sensor is far above the surface (ground level, i.e. drivable),
+    while small values mean a tall obstacle is nearby.
+
+    When the robot faces open space the reward is high; when it faces a wall or
+    obstacle it drops, creating a gradient that encourages rotating toward
+    openings before driving forward (active perception).
+
+    Args:
+        env: The learning environment.
+        sensor_cfg: RayCaster sensor to use.
+        cone_half_angle_deg: Half-angle of the forward cone in degrees.
+
+    Returns:
+        Per-env reward in [0, 1].  1 = full clearance ahead, 0 = fully blocked.
+    """
+    sensor: RayCaster = env.scene.sensors[sensor_cfg.name]
+    max_d = sensor.cfg.max_distance
+
+    # Raw height scan: sensor_z - hit_z.  Large = clear, small = obstacle.
+    scan = height_scan(env, sensor_cfg, offset=0.0)  # (B, N)
+    # Rays that miss (NaN) → treat as clear (nothing within range)
+    scan = torch.nan_to_num(scan, nan=max_d)
+
+    # --- build and cache the forward-cone mask (once) -----------------------
+    cache_attr = "_fwd_clr_mask"
+    if not hasattr(env, cache_attr):
+        cone_half_angle_rad = cone_half_angle_deg * torch.pi / 180.0
+
+        cfg = sensor.cfg.pattern
+        res = cfg.resolution
+        sx, sy = cfg.size
+
+        # Reconstruct grid positions in *sensor* local frame, same as Isaac Lab
+        xs = torch.arange(-sx / 2, sx / 2 + 1e-9, res, device=env.device)
+        ys = torch.arange(-sy / 2, sy / 2 + 1e-9, res, device=env.device)
+        grid_x, grid_y = torch.meshgrid(xs, ys, indexing="xy")
+        gx = grid_x.flatten()
+        gy = grid_y.flatten()
+
+        # Convert to robot body frame by adding sensor offset
+        rx = gx + sensor.cfg.offset.pos[0]
+        ry = gy + sensor.cfg.offset.pos[1]
+
+        # Forward cone: |atan2(y, x)| < cone_half_angle AND x > 0
+        angles = torch.atan2(torch.abs(ry), rx)
+        mask = (rx > 0.1) & (angles < cone_half_angle_rad)
+        setattr(env, cache_attr, mask)
+
+    mask = getattr(env, cache_attr)
+    if mask.sum() == 0:
+        return torch.zeros(env.num_envs, device=env.device)
+
+    # Average clearance in the forward cone, normalised to [0, 1]
+    fwd = scan[:, mask].mean(dim=1)
+    return torch.clamp(fwd / max_d, 0.0, 1.0)
 
 
 def heading_velocity_alignment(
