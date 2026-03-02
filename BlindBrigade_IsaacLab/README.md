@@ -1,135 +1,112 @@
-# Template for Isaac Lab Projects
+# Blind Brigade
 
-## Overview
+RL-based obstacle navigation for ROSbot in Isaac Lab.
 
-This project/repository serves as a template for building projects or extensions based on Isaac Lab.
-It allows you to develop in an isolated environment, outside of the core Isaac Lab repository.
+## Prerequisites
 
-**Key Features:**
-
-- `Isolation` Work outside the core Isaac Lab repository, ensuring that your development efforts remain self-contained.
-- `Flexibility` This template is set up to allow your code to be run as an extension in Omniverse.
-
-**Keywords:** extension, template, isaaclab
+- [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html) (Isaac Sim 4.5+)
+- [rsl_rl](https://github.com/leggedrobotics/rsl_rl) 3.3.0
+- Python >= 3.10
 
 ## Installation
 
-- Install Isaac Lab by following the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html).
-  We recommend using the conda or uv installation as it simplifies calling Python scripts from the terminal.
-
-- Clone or copy this project/repository separately from the Isaac Lab installation (i.e. outside the `IsaacLab` directory):
-
-- Using a python interpreter that has Isaac Lab installed, install the library in editable mode using:
-
-    ```bash
-    # use 'PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-    python -m pip install -e source/BlindBrigade
-
-- Verify that the extension is correctly installed by:
-
-    - Listing the available tasks:
-
-        Note: It the task name changes, it may be necessary to update the search pattern `"Template-"`
-        (in the `scripts/list_envs.py` file) so that it can be listed.
-
-        ```bash
-        # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-        python scripts/list_envs.py
-        ```
-
-    - Running a task:
-
-        ```bash
-        # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-        python scripts/<RL_LIBRARY>/train.py --task=<TASK_NAME>
-        ```
-
-    - Running a task with dummy agents:
-
-        These include dummy agents that output zero or random agents. They are useful to ensure that the environments are configured correctly.
-
-        - Zero-action agent
-
-            ```bash
-            # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-            python scripts/zero_agent.py --task=<TASK_NAME>
-            ```
-        - Random-action agent
-
-            ```bash
-            # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-            python scripts/random_agent.py --task=<TASK_NAME>
-            ```
-
-### Set up IDE (Optional)
-
-To setup the IDE, please follow these instructions:
-
-- Run VSCode Tasks, by pressing `Ctrl+Shift+P`, selecting `Tasks: Run Task` and running the `setup_python_env` in the drop down menu.
-  When running this task, you will be prompted to add the absolute path to your Isaac Sim installation.
-
-If everything executes correctly, it should create a file .python.env in the `.vscode` directory.
-The file contains the python paths to all the extensions provided by Isaac Sim and Omniverse.
-This helps in indexing all the python modules for intelligent suggestions while writing code.
-
-### Setup as Omniverse Extension (Optional)
-
-We provide an example UI extension that will load upon enabling your extension defined in `source/BlindBrigade/BlindBrigade/ui_extension_example.py`.
-
-To enable your extension, follow these steps:
-
-1. **Add the search path of this project/repository** to the extension manager:
-    - Navigate to the extension manager using `Window` -> `Extensions`.
-    - Click on the **Hamburger Icon**, then go to `Settings`.
-    - In the `Extension Search Paths`, enter the absolute path to the `source` directory of this project/repository.
-    - If not already present, in the `Extension Search Paths`, enter the path that leads to Isaac Lab's extension directory directory (`IsaacLab/source`)
-    - Click on the **Hamburger Icon**, then click `Refresh`.
-
-2. **Search and enable your extension**:
-    - Find your extension under the `Third Party` category.
-    - Toggle it to enable your extension.
-
-## Code formatting
-
-We have a pre-commit template to automatically format your code.
-To install pre-commit:
+With a Python environment that has Isaac Lab installed:
 
 ```bash
-pip install pre-commit
+pip install -e source/BlindBrigade_tasks
+pip install -e source/BlindBrigade_assets
 ```
 
-Then you can run pre-commit with:
+## Environments
+
+| Task ID | Description |
+|---|---|
+| `BB-rosbot-flat-v0` | Flat terrain point-to-point |
+| `BB-rosbot-box-v0` | Box obstacle navigation |
+| `BB-rosbot-maze-v0` | Procedural maze navigation |
+| `BB-rosbot-coop-flat-v0` | 2-agent cooperative (flat) |
+| `BB-rosbot-coop-box-v0` | 2-agent cooperative (box obstacles) |
+
+Each task has a `-PLAY-v0` variant (e.g. `BB-rosbot-box-PLAY-v0`) for visualization with a single small environment.
+
+## Quick Start
 
 ```bash
-pre-commit run --all-files
+# Train
+python scripts/rsl_rl/train.py --task BB-rosbot-box-v0 --num_envs 4096 --headless
+
+# Play back a trained policy
+python scripts/rsl_rl/play.py --task BB-rosbot-box-PLAY-v0 --num_envs 8
+
+# Resume training from a checkpoint
+python scripts/rsl_rl/train.py --task BB-rosbot-box-v0 --resume --load_run <timestamp>
+
+# Teleop
+python scripts/agents/teleop_agent.py --task BB-rosbot-box-PLAY-v0
+```
+
+Common flags: `--seed`, `--max_iterations`, `--video`, `--checkpoint`, `--logger wandb`
+
+## Scripts
+
+| Directory | Contents |
+|---|---|
+| `scripts/rsl_rl/` | `train.py`, `play.py`, CNN feature / Grad-CAM visualization, occupancy grid export |
+| `scripts/agents/` | Random, zero, teleop, and potential-field controllers |
+| `scripts/viz/` | Reward function visualization (heading alignment, SRU rewards) |
+| `scripts/debug/` | Step response, lateral dynamics test, USD prim dump |
+
+## Policy Architectures
+
+Available agent configs for `BB-rosbot-box-v0` (selected via `--agent_id`):
+
+| Architecture | Entry Point Key | Description |
+|---|---|---|
+| MLP | `rsl_rl_cfg_entry_point` | Default feedforward actor-critic |
+| CNN + MLP | `rsl_rl_cnn_cfg_entry_point` | Height-map CNN encoder + MLP head |
+| GRU + Raycaster | `rsl_rl_gru_cfg_entry_point` | 1-D height-scan encoder with GRU memory |
+| LSTM + CNN | `rsl_rl_recurrent_cnn_cfg_entry_point` | Per-step CNN encoder with LSTM memory |
+| Student-Teacher (MLP) | `rsl_rl_distil_cfg_entry_point` | MLP student distilled from MLP teacher |
+| Student-Teacher (CNN) | `rsl_rl_distil_cnn_cfg_entry_point` | CNN student distilled from MLP teacher |
+| Student-Teacher (MLP enc.) | `rsl_rl_distil_mlp_cfg_entry_point` | Flat-image MLP student from MLP teacher |
+
+Custom network modules live in `source/BlindBrigade_tasks/BlindBrigade_tasks/modules/`.
+
+## Project Structure
+
+```
+BlindBrigade_IsaacLab/
+├── scripts/
+│   ├── rsl_rl/          # Training & playback
+│   ├── agents/          # Non-learned controllers
+│   ├── viz/             # Reward visualization
+│   └── debug/           # Dynamics testing & introspection
+├── source/
+│   ├── BlindBrigade_tasks/
+│   │   └── BlindBrigade_tasks/
+│   │       ├── tasks/
+│   │       │   ├── rosbot/              # Single-agent tasks (flat, box)
+│   │       │   ├── rosbot_maze/         # Procedural maze task
+│   │       │   └── rosbot_cooperative/  # Multi-agent tasks
+│   │       ├── common/mdp/              # Shared observations, rewards, actions, commands
+│   │       └── modules/                 # Custom policy networks
+│   └── BlindBrigade_assets/
+│       └── BlindBrigade_assets/
+│           └── robot/                   # Robot asset configs
+└── logs/rsl_rl/                         # Training outputs
 ```
 
 ## Troubleshooting
 
-### Pylance Missing Indexing of Extensions
+### Pylance Missing Indexing
 
-In some VsCode versions, the indexing of part of the extensions is missing.
-In this case, add the path to your extension in `.vscode/settings.json` under the key `"python.analysis.extraPaths"`.
+If VS Code / Pylance cannot resolve imports, add the extension paths to `.vscode/settings.json`:
 
 ```json
 {
     "python.analysis.extraPaths": [
-        "<path-to-ext-repo>/source/BlindBrigade"
+        "source/BlindBrigade_tasks",
+        "source/BlindBrigade_assets"
     ]
 }
-```
-
-### Pylance Crash
-
-If you encounter a crash in `pylance`, it is probable that too many files are indexed and you run out of memory.
-A possible solution is to exclude some of omniverse packages that are not used in your project.
-To do so, modify `.vscode/settings.json` and comment out packages under the key `"python.analysis.extraPaths"`
-Some examples of packages that can likely be excluded are:
-
-```json
-"<path-to-isaac-sim>/extscache/omni.anim.*"         // Animation packages
-"<path-to-isaac-sim>/extscache/omni.kit.*"          // Kit UI tools
-"<path-to-isaac-sim>/extscache/omni.graph.*"        // Graph UI tools
-"<path-to-isaac-sim>/extscache/omni.services.*"     // Services tools
-...
 ```
