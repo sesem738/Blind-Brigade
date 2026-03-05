@@ -68,7 +68,7 @@ from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 ##
 # Pre-defined configs
 ##
-from BlindBrigade_assets.robot.rosbot_xl_mecanum import ROSBOT_XL_CFG
+from BlindBrigade_assets.robot.rosbot_xl import ROSBOT_XL_MECANUM_CFG
 from isaaclab.envs.mdp.commands import TerrainBasedPose2dCommandCfg
 from . import mdp
 
@@ -141,14 +141,14 @@ class ROSBotSceneCfg(InteractiveSceneCfg):
         spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
 
-    guide: ArticulationCfg = ROSBOT_XL_CFG.replace(
+    guide: ArticulationCfg = ROSBOT_XL_MECANUM_CFG.replace(
         prim_path="{ENV_REGEX_NS}/Guide",
-        spawn=ROSBOT_XL_CFG.spawn.replace(activate_contact_sensors=True),
+        spawn=ROSBOT_XL_MECANUM_CFG.spawn.replace(activate_contact_sensors=True),
     )
 
-    blind: ArticulationCfg = ROSBOT_XL_CFG.replace(
+    blind: ArticulationCfg = ROSBOT_XL_MECANUM_CFG.replace(
         prim_path="{ENV_REGEX_NS}/Blind",
-        spawn=ROSBOT_XL_CFG.spawn.replace(activate_contact_sensors=True),
+        spawn=ROSBOT_XL_MECANUM_CFG.spawn.replace(activate_contact_sensors=True),
     )
     
     guide_robot_contact_sensor: ContactSensorCfg = ContactSensorCfg(

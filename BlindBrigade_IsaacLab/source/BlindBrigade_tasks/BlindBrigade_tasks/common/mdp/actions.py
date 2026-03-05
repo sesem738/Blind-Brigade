@@ -149,7 +149,7 @@ class SE2BaseMecanumDriveCfg(ActionTermCfg):
     # Action limits (body frame)
     max_vx: float = 1.0
     max_vy: float = 1.0
-    max_wz: float = 10.0
+    max_wz: float = 2.0
 
     # Acounting for model errors
     scale_factor_vx: float = 1.0

@@ -4,7 +4,7 @@ from isaaclab.sensors import ContactSensorCfg, RayCasterCfg, patterns
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
 
-from BlindBrigade_assets.robot.rosbot_xl_mecanum import ROSBOT_XL_CFG
+from BlindBrigade_assets.robot.rosbot_xl import ROSBOT_XL_MECANUM_CFG
 from BlindBrigade_tasks.common.terrains import (
     MazeTerrainImporterCfg,
     MazeTerrainGeneratorCfg,
@@ -67,9 +67,9 @@ class ROSBotMazeSceneCfg(InteractiveSceneCfg):
         spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
 
-    robot: ArticulationCfg = ROSBOT_XL_CFG.replace(
+    robot: ArticulationCfg = ROSBOT_XL_MECANUM_CFG.replace(
         prim_path="{ENV_REGEX_NS}/Robot",
-        spawn=ROSBOT_XL_CFG.spawn.replace(activate_contact_sensors=True),
+        spawn=ROSBOT_XL_MECANUM_CFG.spawn.replace(activate_contact_sensors=True),
     )
 
     robot_contact_sensor: ContactSensorCfg = ContactSensorCfg(
