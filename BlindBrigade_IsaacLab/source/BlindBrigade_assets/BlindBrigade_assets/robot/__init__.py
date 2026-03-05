@@ -1,1 +1,1 @@
-from .rosbot_xl import ROSBOT_XL_MECANUM_CFG
+from .rosbot_xl import ROSBOT_XL_MECANUM_CFG, ROSBOT_XL_DIFFERENTIAL_CFG
