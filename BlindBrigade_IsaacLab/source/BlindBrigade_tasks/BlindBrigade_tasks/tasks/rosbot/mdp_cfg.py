@@ -133,9 +133,9 @@ class ObservationsCfg:
     policy: PolicyCfg = PolicyCfg()
     critic: CriticCfg = CriticCfg()
     proprioceptive: ProprioceptiveCfg = ProprioceptiveCfg()
-    # exteroceptive: ExteroceptiveCameraCfg = ExteroceptiveCameraCfg()
-    # exteroceptive_flat: ExteroceptiveCameraFlatCfg = ExteroceptiveCameraFlatCfg()
-    # heightscan: HeightScanCfg = HeightScanCfg()
+    exteroceptive: ExteroceptiveCameraCfg = ExteroceptiveCameraCfg()
+    exteroceptive_flat: ExteroceptiveCameraFlatCfg = ExteroceptiveCameraFlatCfg()
+    heightscan: HeightScanCfg = HeightScanCfg()
 
 
 @configclass
@@ -197,11 +197,15 @@ class SRURewardsCfg:
 
     terminating = RewTerm(func=mdp.is_terminated, weight=-50.0)
 
-    lateral_movement = RewTerm(func=mdp.lateral_movement, weight=-0.1)
+    lateral_movement = RewTerm(func=mdp.lateral_movement, weight=-0.0)
 
-    backward_movement_penalty = RewTerm(func=mdp.backward_movement_penalty, weight=-0.1)
+    backward_movement_penalty = RewTerm(func=mdp.backward_movement_penalty, weight=-0.0)
 
-    rot_movement = RewTerm(func=mdp.rot_movement, weight=-1e-5)
+    rot_movement = RewTerm(
+        func=mdp.rot_movement,
+        weight=-0.5,
+        params={"asset_cfg": SceneEntityCfg("robot"), "dist_threshold": 10000},
+    )
 
     # Goal rewards
     reach_goal_xy_soft = RewTerm(
@@ -218,7 +222,7 @@ class SRURewardsCfg:
     
     heading_velocity_alignment = RewTerm(
         func=mdp.heading_velocity_alignment, 
-        weight=-0.2,
+        weight=-10.0,
         params={"asset_cfg": SceneEntityCfg("robot"), "max_speed": 0.5},
     )
 

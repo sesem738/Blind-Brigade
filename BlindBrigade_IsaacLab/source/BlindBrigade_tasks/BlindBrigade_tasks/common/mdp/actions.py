@@ -127,6 +127,105 @@ class SE2BaseMecanumDrive(ActionTerm):
         self._lpf_state[env_ids] = 0.0
 
 
+class DifferentialDrive(ActionTerm):
+    """Action term for differential-drive control.
+
+    Accepts a 2D action (v, omega) — forward velocity and yaw rate — and converts
+    them to left/right wheel velocity targets using differential-drive kinematics:
+
+        w_left  = (v - omega * half_track) / wheel_radius
+        w_right = (v + omega * half_track) / wheel_radius
+
+    For a 4-wheel robot, the front and rear wheels on each side receive the same target.
+    No root velocity override — the robot moves purely through wheel physics.
+    """
+
+    cfg: DifferentialDriveCfg
+    _asset: Articulation
+
+    def __init__(self, cfg: DifferentialDriveCfg, env: ManagerBasedRLEnv):
+        super().__init__(cfg, env)
+        self._asset = env.scene[cfg.asset_name]
+        self._wheel_joint_ids, _ = self._asset.find_joints(list(cfg.wheel_joints))
+        self._raw_actions = torch.zeros(env.num_envs, 2, device=self.device)
+        self._processed_actions = torch.zeros(env.num_envs, 2, device=self.device)
+        self._lpf_state = torch.zeros(env.num_envs, 2, device=self.device)
+
+    @property
+    def action_dim(self) -> int:
+        return 2
+
+    @property
+    def raw_actions(self) -> torch.Tensor:
+        return self._raw_actions
+
+    @property
+    def processed_actions(self) -> torch.Tensor:
+        return self._processed_actions
+
+    def process_actions(self, actions: torch.Tensor):
+        self._raw_actions[:] = actions
+        # Low-pass filter
+        alpha = self.cfg.action_lpf_alpha
+        self._lpf_state = alpha * actions + (1.0 - alpha) * self._lpf_state
+        # Scale to velocity limits
+        limits = torch.tensor([self.cfg.max_v, self.cfg.max_omega], device=self.device)
+        self._processed_actions = torch.clamp(self._lpf_state * limits, -limits, limits)
+
+    def apply_actions(self):
+        v = self._processed_actions[:, 0]
+        omega = self._processed_actions[:, 1]
+
+        r = self.cfg.wheel_radius
+        d = self.cfg.half_track  # half the distance between left and right wheels
+
+        # Differential drive kinematics
+        w_left = (v - omega * d) / r
+        w_right = (v + omega * d) / r
+
+        # Clamp wheel speeds
+        w_left = torch.clamp(w_left, -self.cfg.max_wheel_speed, self.cfg.max_wheel_speed)
+        w_right = torch.clamp(w_right, -self.cfg.max_wheel_speed, self.cfg.max_wheel_speed)
+
+        # Both front and rear on same side get the same target
+        wheel_vel_targets = torch.stack([w_left, w_right, w_left, w_right], dim=-1)
+        self._asset.set_joint_velocity_target(wheel_vel_targets, joint_ids=self._wheel_joint_ids)
+
+    def reset(self, env_ids: torch.Tensor | None = None):
+        if env_ids is None:
+            env_ids = torch.arange(self.num_envs, device=self.device)
+        self._raw_actions[env_ids] = 0.0
+        self._processed_actions[env_ids] = 0.0
+        self._lpf_state[env_ids] = 0.0
+
+
+@configclass
+class DifferentialDriveCfg(ActionTermCfg):
+    """Configuration for :class:`DifferentialDrive`."""
+
+    class_type: type = DifferentialDrive
+    asset_name: str = "robot"
+
+    # Wheel geometry
+    wheel_radius: float = 0.05
+    half_track: float = 0.105  # half the distance between left and right wheels
+
+    # Joint names: FL, FR, RL, RR
+    wheel_joints: tuple[str, str, str, str] = (
+        "fl_wheel_joint", "fr_wheel_joint", "rl_wheel_joint", "rr_wheel_joint"
+    )
+
+    # Action limits
+    max_v: float = 1.0       # max forward/backward velocity (m/s)
+    max_omega: float = 2.0   # max yaw rate (rad/s)
+
+    # Clamp wheel speeds (rad/s)
+    max_wheel_speed: float = 60.0
+
+    # Low-pass filter alpha (0→1): 1.0 = no filtering, lower = smoother
+    action_lpf_alpha: float = 1.0
+
+
 @configclass
 class SE2BaseMecanumDriveCfg(ActionTermCfg):
     """Configuration for :class:`SE2BaseMecanumDrive`.
