@@ -201,11 +201,7 @@ class SRURewardsCfg:
 
     backward_movement_penalty = RewTerm(func=mdp.backward_movement_penalty, weight=-0.0)
 
-    rot_movement = RewTerm(
-        func=mdp.rot_movement,
-        weight=-0.5,
-        params={"asset_cfg": SceneEntityCfg("robot"), "dist_threshold": 10000},
-    )
+    rot_movement = RewTerm(func=mdp.rot_movement, weight=-1e-5)
 
     # Goal rewards
     reach_goal_xy_soft = RewTerm(
