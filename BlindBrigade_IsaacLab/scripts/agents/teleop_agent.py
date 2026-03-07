@@ -1,16 +1,22 @@
 """Script to teleoperate a robot in an Isaac Lab environment using keyboard.
 
-Usage:
-    python scripts/agents/teleop_agent.py --task=BB-rosbot-coop-flat-v0 --num_envs=1
-    python scripts/agents/teleop_agent.py --task=BB-rosbot-box-PLAY-v0 --num_envs=1
+Automatically detects the drive type (mecanum, differential, ackermann) from
+the environment's action configuration and maps keyboard inputs accordingly.
 
-Controls:
-    Arrow Up / Numpad 8   : Forward  (+vx)
-    Arrow Down / Numpad 2 : Backward (-vx)
-    Arrow Left / Numpad 4 : Strafe right (+vy)
-    Arrow Right / Numpad 6: Strafe left  (-vy)
-    Z / Numpad 7          : Yaw left  (+wz)
-    X / Numpad 9          : Yaw right (-wz)
+Usage:
+    python scripts/agents/teleop_agent.py --task=BB-rosbot-box-PLAY-v0 --num_envs=1
+    python scripts/agents/teleop_agent.py --task=BB-rosbot-diff-box-PLAY-v0 --num_envs=1
+
+Controls (all drive types):
+    Arrow Up / Numpad 8   : Forward  (+v)
+    Arrow Down / Numpad 2 : Backward (-v)
+    Q / Numpad 7          : Yaw left  (+wz / +steering)
+    E / Numpad 9          : Yaw right (-wz / -steering)
+
+Mecanum only:
+    Arrow Left / Numpad 4 : Strafe left  (+vy)
+    Arrow Right / Numpad 6: Strafe right (-vy)
+
     L                     : Reset commands to zero
 """
 
@@ -52,6 +58,77 @@ from isaaclab.devices.keyboard import Se2Keyboard, Se2KeyboardCfg
 
 import BlindBrigade_tasks.tasks  # noqa: F401
 
+# Drive type constants
+DRIVE_MECANUM = "mecanum"
+DRIVE_DIFFERENTIAL = "differential"
+DRIVE_ACKERMANN = "ackermann"
+DRIVE_UNKNOWN = "unknown"
+
+
+def detect_drive_type(env) -> str:
+    """Detect drive type from the environment's action manager.
+
+    Inspects the action term class to determine the robot's drive type.
+    Falls back to action dimension if the class is unrecognized.
+    """
+    from BlindBrigade_tasks.common.mdp.actions import SE2BaseMecanumDrive, DifferentialDrive, AckermannDrive
+    from isaaclab.envs.mdp.actions.non_holonomic_actions import NonHolonomicAction
+
+    action_manager = env.unwrapped.action_manager
+    for term in action_manager._terms.values():
+        if isinstance(term, SE2BaseMecanumDrive):
+            return DRIVE_MECANUM
+        elif isinstance(term, DifferentialDrive):
+            return DRIVE_DIFFERENTIAL
+        elif isinstance(term, AckermannDrive):
+            return DRIVE_ACKERMANN
+        elif isinstance(term, NonHolonomicAction):
+            return DRIVE_DIFFERENTIAL
+
+    # Fallback: guess from action dimension
+    action_dim = env.action_space.shape[-1]
+    if action_dim == 3:
+        return DRIVE_MECANUM
+    elif action_dim == 2:
+        return DRIVE_DIFFERENTIAL
+    return DRIVE_UNKNOWN
+
+
+def teleop_to_action(teleop_cmd: torch.Tensor, drive_type: str, action_dim: int, device) -> torch.Tensor:
+    """Map Se2Keyboard output (vx, vy, wz) to the correct action layout.
+
+    Args:
+        teleop_cmd: (3,) tensor from Se2Keyboard — (vx, vy, wz).
+        drive_type: One of DRIVE_MECANUM, DRIVE_DIFFERENTIAL, DRIVE_ACKERMANN.
+        action_dim: Total action dimension of the environment.
+        device: Torch device.
+
+    Returns:
+        (action_dim,) tensor with the teleop command mapped to the right indices.
+    """
+    action = torch.zeros(action_dim, device=device)
+    vx, vy, wz = teleop_cmd[0], teleop_cmd[1], teleop_cmd[2]
+
+    if drive_type == DRIVE_MECANUM:
+        # (vx, vy, wz)
+        action[0] = vx
+        action[1] = vy
+        action[2] = wz
+    elif drive_type == DRIVE_DIFFERENTIAL:
+        # (v, omega) — no lateral
+        action[0] = vx
+        action[1] = wz
+    elif drive_type == DRIVE_ACKERMANN:
+        # (v, steering_angle) — wz maps to steering
+        action[0] = vx
+        action[1] = wz
+    else:
+        # Best-effort: fill what fits
+        n = min(3, action_dim)
+        action[:n] = teleop_cmd[:n]
+
+    return action
+
 
 def main():
     """Teleop agent with Isaac Lab environment."""
@@ -62,16 +139,26 @@ def main():
     # create environment
     env = gym.make(args_cli.task, cfg=env_cfg)
 
-    # print info
-    print(f"[INFO]: Gym observation space: {env.observation_space}")
-    print(f"[INFO]: Gym action space      : {env.action_space}")
+    # detect drive type
+    drive_type = detect_drive_type(env)
 
     action_dim = env.action_space.shape[-1]
     device = env.unwrapped.device
     num_envs = env.unwrapped.num_envs
 
+    print(f"[INFO]: Gym observation space: {env.observation_space}")
+    print(f"[INFO]: Gym action space      : {env.action_space}")
+    print(f"[INFO]: Detected drive type   : {drive_type}")
+    print(f"[INFO]: Action dim            : {action_dim}")
+
+    if drive_type == DRIVE_MECANUM:
+        print("[INFO]: Controls: Up/Down=forward/back, Left/Right=strafe, Z/X=yaw")
+    elif drive_type == DRIVE_DIFFERENTIAL:
+        print("[INFO]: Controls: Up/Down=forward/back, Z/X=yaw (no strafe)")
+    elif drive_type == DRIVE_ACKERMANN:
+        print("[INFO]: Controls: Up/Down=forward/back, Z/X=steering (no strafe)")
+
     # create keyboard controller
-    # Se2Keyboard outputs (vx, vy, wz) in [-sensitivity, +sensitivity]
     sens = args_cli.sensitivity
     keyboard = Se2Keyboard(Se2KeyboardCfg(
         v_x_sensitivity=sens,
@@ -79,9 +166,11 @@ def main():
         omega_z_sensitivity=sens,
         sim_device=device,
     ))
-    print(keyboard)
-    print(f"\n[INFO]: Action dim = {action_dim}. Keyboard controls first 3 dims (guide robot).")
-    print("[INFO]: Remaining action dims (blind robot) are zeroed out.\n")
+    # Rebind yaw keys from Z/X to Q/E
+    import numpy as np
+    key_map = keyboard._INPUT_KEY_MAPPING
+    key_map["Q"] = key_map.pop("Z")   # yaw left
+    key_map["E"] = key_map.pop("X")   # yaw right
 
     # visualize flat patches if available
     flat_patches = env.unwrapped.scene.terrain.flat_patches
@@ -114,13 +203,14 @@ def main():
         start_time = time.time()
 
         with torch.inference_mode():
-            # get keyboard SE(2) command: (vx, vy, wz) in [-sens, +sens]
+            # Se2Keyboard outputs (vx, vy, wz) in [-sens, +sens]
             teleop_cmd = keyboard.advance()  # shape (3,)
 
-            # build full action tensor
-            actions = torch.zeros(num_envs, action_dim, device=device)
-            # fill first 3 dims (guide robot) for all envs
-            actions[:, :3] = teleop_cmd.unsqueeze(0)
+            # map to the correct action layout for this drive type
+            mapped = teleop_to_action(teleop_cmd, drive_type, action_dim, device)
+
+            # broadcast to all envs
+            actions = mapped.unsqueeze(0).expand(num_envs, -1)
 
             env.step(actions)
 

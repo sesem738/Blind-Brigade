@@ -1,7 +1,7 @@
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.assets import ArticulationCfg
 from isaaclab.sim import UsdFileCfg, RigidBodyPropertiesCfg
-from .. import BLINDBRIGADE_ASSETS_DATA_DIR
+from BlindBrigade_assets import BLINDBRIGADE_ASSETS_DATA_DIR
 
 ROSBOT_XL_MECANUM_CFG = ArticulationCfg(
     prim_path="{ENV_REGEX_NS}/Robot",
