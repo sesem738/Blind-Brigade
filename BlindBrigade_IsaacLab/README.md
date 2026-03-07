@@ -26,6 +26,10 @@ pip install -e source/BlindBrigade_assets
 | `BB-rosbot-maze-v0` | Procedural maze navigation |
 | `BB-rosbot-coop-flat-v0` | 2-agent cooperative (flat) |
 | `BB-rosbot-coop-box-v0` | 2-agent cooperative (box obstacles) |
+| `BB-rosbot-diff-flat-v0` | Differential drive, flat terrain (WIP — not fully working) |
+| `BB-rosbot-diff-box-v0` | Differential drive, box obstacles (WIP — not fully working) |
+| `BB-mushr-flat-v0` | MuSHR (Ackermann steering), flat terrain (working, untested in training) |
+| `BB-mushr-box-v0` | MuSHR (Ackermann steering), box obstacles (working, untested in training) |
 
 Each task has a `-PLAY-v0` variant (e.g. `BB-rosbot-box-PLAY-v0`) for visualization with a single small environment.
 
@@ -86,6 +90,8 @@ BlindBrigade_IsaacLab/
 │   │   └── BlindBrigade_tasks/
 │   │       ├── tasks/
 │   │       │   ├── rosbot/              # Single-agent tasks (flat, box)
+│   │       │   ├── rosbot_differential/ # Differential drive tasks (WIP)
+│   │       │   ├── mushr/              # MuSHR Ackermann steering tasks (untested)
 │   │       │   ├── rosbot_maze/         # Procedural maze task
 │   │       │   └── rosbot_cooperative/  # Multi-agent tasks
 │   │       ├── common/mdp/              # Shared observations, rewards, actions, commands
@@ -95,6 +101,17 @@ BlindBrigade_IsaacLab/
 │           └── robot/                   # Robot asset configs
 └── logs/rsl_rl/                         # Training outputs
 ```
+
+## VS Code Extension: Isaac Lab Runner
+
+A sidebar extension for launching train/play sessions without typing CLI commands. Provides dropdowns for task, agent config, experiment, run, and checkpoint selection — all auto-detected from the codebase.
+
+```bash
+bash tools/isaaclab-runner/install.sh
+# then restart VS Code
+```
+
+See [`tools/isaaclab-runner/README.md`](tools/isaaclab-runner/README.md) for details.
 
 ## Troubleshooting
 
